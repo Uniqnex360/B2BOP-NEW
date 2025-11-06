@@ -243,7 +243,7 @@ export default function BuyerCatalogPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="sticky top-0 z-40 bg-white py-6 -mx-6 px-6 shadows-sm flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-slate-900">Product Catalog</h1>
           <p className="text-slate-600 mt-1">{filteredProducts.length} products available</p>
@@ -263,7 +263,7 @@ export default function BuyerCatalogPage() {
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-xl border border-slate-200 p-4">
+      <div className="sticky top-24 z-30   bg-white rounded-xl border border-slate-200 p-4">
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
