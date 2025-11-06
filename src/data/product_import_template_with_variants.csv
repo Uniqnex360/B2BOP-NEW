@@ -1,0 +1,11 @@
+parent_sku,variant_sku,product_name,variant_name,category,brand,description,unit_price,cost_price,stock_quantity,min_order_quantity,max_order_quantity,unit_of_measure,image_url,size,color,material,weight
+TSHIRT-001,TSHIRT-001-S-RED,Premium Cotton T-Shirt,Small Red,Clothing,BrandX,High quality cotton t-shirt,19.99,8.00,100,1,500,unit,https://example.com/tshirt-red.jpg,S,Red,Cotton,200g
+TSHIRT-001,TSHIRT-001-M-RED,Premium Cotton T-Shirt,Medium Red,Clothing,BrandX,High quality cotton t-shirt,19.99,8.00,150,1,500,unit,https://example.com/tshirt-red.jpg,M,Red,Cotton,220g
+TSHIRT-001,TSHIRT-001-L-RED,Premium Cotton T-Shirt,Large Red,Clothing,BrandX,High quality cotton t-shirt,19.99,8.00,120,1,500,unit,https://example.com/tshirt-red.jpg,L,Red,Cotton,240g
+TSHIRT-001,TSHIRT-001-S-BLUE,Premium Cotton T-Shirt,Small Blue,Clothing,BrandX,High quality cotton t-shirt,19.99,8.00,80,1,500,unit,https://example.com/tshirt-blue.jpg,S,Blue,Cotton,200g
+TSHIRT-001,TSHIRT-001-M-BLUE,Premium Cotton T-Shirt,Medium Blue,Clothing,BrandX,High quality cotton t-shirt,19.99,8.00,130,1,500,unit,https://example.com/tshirt-blue.jpg,M,Blue,Cotton,220g
+MOUSE-001,MOUSE-001-BLACK,Wireless Gaming Mouse,Black Edition,Electronics,TechCo,Ergonomic wireless mouse with RGB lighting,49.99,25.00,50,1,100,unit,https://example.com/mouse-black.jpg,,,Plastic,150g
+MOUSE-001,MOUSE-001-WHITE,Wireless Gaming Mouse,White Edition,Electronics,TechCo,Ergonomic wireless mouse with RGB lighting,49.99,25.00,45,1,100,unit,https://example.com/mouse-white.jpg,,,Plastic,150g
+LAPTOP-001,LAPTOP-001-8GB,Business Laptop,8GB RAM,Electronics,CompuBrand,Professional laptop for business use,899.99,600.00,20,1,50,unit,https://example.com/laptop.jpg,,,Aluminum,1.5kg
+LAPTOP-001,LAPTOP-001-16GB,Business Laptop,16GB RAM,Electronics,CompuBrand,Professional laptop for business use,1099.99,750.00,15,1,50,unit,https://example.com/laptop.jpg,,,Aluminum,1.5kg
+LAPTOP-001,LAPTOP-001-32GB,Business Laptop,32GB RAM,Electronics,CompuBrand,Professional laptop for business use,1399.99,950.00,10,1,50,unit,https://example.com/laptop.jpg,,,Aluminum,1.5kg

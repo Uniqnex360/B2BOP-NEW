@@ -1,0 +1,7 @@
+industry,brand,category_1,category_2,category_3,category_4,category_5,end_category,sku,price,stock_quantity,min_stock_level,name,description,features,specifications,image_url,additional_images
+Electronics,Acme Corp,Gadgets,Office Supplies,,,,Gadgets,SAMPLE-SKU-001,19.99,100,10,Sample Product Name,"A detailed description of the sample product, highlighting its its key benefits and uses.","Feature 1 description
+Feature 2 description
+Feature 3 description","Material: High-quality Plastic
+Color: Black
+Weight: 1.5 kg",https://example.com/image1.jpg,"https://example.com/additional-image1.jpg
+https://example.com/additional-image2.jpg"
