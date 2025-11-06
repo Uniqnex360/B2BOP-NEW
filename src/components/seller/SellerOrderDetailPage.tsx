@@ -160,7 +160,6 @@ export default function SellerOrderDetailPage({ orderId, onBack }: SellerOrderDe
         .eq('order_id', orderId)
         .order('created_at')
     ]);
-
     setOrder(orderRes.data);
     setOrderItems(itemsRes.data || []);
     setLoading(false);

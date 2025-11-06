@@ -26,6 +26,8 @@ export default function OrderDetailPage({ orderId, onBack, onNavigate }: OrderDe
 
     setOrder(data);
     setLoading(false);
+  console.log('data',data)
+
   };
 
   const getStatusColor = (status: string) => {
