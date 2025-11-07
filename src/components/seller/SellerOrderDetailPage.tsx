@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { ArrowLeft, Printer, Package, MapPin, CreditCard, Truck } from 'lucide-react';
+import { ArrowLeft, Printer, Package, MapPin, CreditCard, Truck, CheckCircle } from 'lucide-react';
 
 interface SellerOrderDetailPageProps {
   orderId: string;
@@ -13,14 +13,15 @@ interface FulfillmentModalProps {
   warehouses: any[];
   onClose: () => void;
   onFulfill: (orderItemId: string, warehouseId: string, quantity: number) => void;
+  remainingQuantity: number;
 }
 
-function FulfillmentModal({ orderItem, warehouses, onClose, onFulfill }: FulfillmentModalProps) {
+function FulfillmentModal({ orderItem, warehouses, onClose, onFulfill, remainingQuantity }: FulfillmentModalProps) {
   const [selectedWarehouse, setSelectedWarehouse] = useState('');
-  const [quantity, setQuantity] = useState(orderItem.quantity);
+  const [quantity, setQuantity] = useState(Math.min(remainingQuantity, orderItem.quantity));
 
   const handleSubmit = () => {
-    if (selectedWarehouse && quantity > 0) {
+    if (selectedWarehouse && quantity > 0 && quantity <= remainingQuantity) {
       onFulfill(orderItem.id, selectedWarehouse, quantity);
       onClose();
     }
@@ -34,6 +35,13 @@ function FulfillmentModal({ orderItem, warehouses, onClose, onFulfill }: Fulfill
         </h3>
 
         <div className="space-y-4">
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <p className="text-sm text-amber-800">
+              <span className="font-semibold">Ordered:</span> {orderItem.quantity} units<br/>
+              <span className="font-semibold">Remaining to fulfill:</span> {remainingQuantity} units
+            </p>
+          </div>
+
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">
               Select Warehouse
@@ -59,13 +67,13 @@ function FulfillmentModal({ orderItem, warehouses, onClose, onFulfill }: Fulfill
             <input
               type="number"
               min="1"
-              max={orderItem.quantity}
+              max={remainingQuantity}
               value={quantity}
-              onChange={(e) => setQuantity(parseInt(e.target.value))}
+              onChange={(e) => setQuantity(parseInt(e.target.value) || 0)}
               className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
             <p className="text-xs text-slate-500 mt-1">
-              Max: {orderItem.quantity} units
+              Max: {remainingQuantity} units (unfulfilled)
             </p>
           </div>
 
@@ -84,7 +92,7 @@ function FulfillmentModal({ orderItem, warehouses, onClose, onFulfill }: Fulfill
             </button>
             <button
               onClick={handleSubmit}
-              disabled={!selectedWarehouse || quantity <= 0}
+              disabled={!selectedWarehouse || quantity <= 0 || quantity > remainingQuantity}
               className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
             >
               Move to Logistics
@@ -100,6 +108,7 @@ export default function SellerOrderDetailPage({ orderId, onBack }: SellerOrderDe
   const { profile } = useAuth();
   const [order, setOrder] = useState<any>(null);
   const [orderItems, setOrderItems] = useState<any[]>([]);
+  const [fulfilledQuantities, setFulfilledQuantities] = useState<Record<string, number>>({});
   const [warehouses, setWarehouses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showFulfillmentModal, setShowFulfillmentModal] = useState(false);
@@ -128,7 +137,7 @@ export default function SellerOrderDetailPage({ orderId, onBack }: SellerOrderDe
 
     setLoading(true);
 
-    const [orderRes, itemsRes] = await Promise.all([
+    const [orderRes, itemsRes, shipmentsRes] = await Promise.all([
       supabase
         .from('orders')
         .select(`
@@ -158,15 +167,55 @@ export default function SellerOrderDetailPage({ orderId, onBack }: SellerOrderDe
           products(id, name, sku, image_url)
         `)
         .eq('order_id', orderId)
-        .order('created_at')
+        .order('created_at'),
+      supabase
+        .from('shipment_items')
+        .select(`
+          quantity,
+          order_item_id,
+          shipments!inner(order_id, status)
+        `)
+        .eq('shipments.order_id', orderId)
     ]);
+
     setOrder(orderRes.data);
     setOrderItems(itemsRes.data || []);
+
+    // Calculate fulfilled quantities per order item
+    const fulfilled: Record<string, number> = {};
+    if (shipmentsRes.data) {
+      shipmentsRes.data.forEach((si: any) => {
+        const itemId = si.order_item_id;
+        fulfilled[itemId] = (fulfilled[itemId] || 0) + si.quantity;
+      });
+    }
+    setFulfilledQuantities(fulfilled);
+
     setLoading(false);
+  };
+
+  const getRemainingQuantity = (orderItemId: string, orderedQuantity: number) => {
+    const fulfilled = fulfilledQuantities[orderItemId] || 0;
+    return orderedQuantity - fulfilled;
+  };
+
+  const isFullyFulfilled = (orderItemId: string, orderedQuantity: number) => {
+    return getRemainingQuantity(orderItemId, orderedQuantity) <= 0;
   };
 
   const handleFulfillItem = async (orderItemId: string, warehouseId: string, quantity: number) => {
     try {
+      const orderItem = orderItems.find(item => item.id === orderItemId);
+      if (!orderItem) throw new Error('Order item not found');
+
+      const remaining = getRemainingQuantity(orderItemId, orderItem.quantity);
+      
+      // Validate quantity
+      if (quantity > remaining) {
+        alert(`Cannot fulfill ${quantity} units. Only ${remaining} units remaining.`);
+        return;
+      }
+
       // Create shipment
       const { data: shipment, error: shipmentError } = await supabase
         .from('shipments')
@@ -195,7 +244,7 @@ export default function SellerOrderDetailPage({ orderId, onBack }: SellerOrderDe
       if (itemError) throw itemError;
 
       alert('Item moved to logistics successfully!');
-      loadOrderDetails();
+      await loadOrderDetails();
     } catch (error) {
       console.error('Error fulfilling item:', error);
       alert('Failed to move item to logistics');
@@ -344,6 +393,7 @@ export default function SellerOrderDetailPage({ orderId, onBack }: SellerOrderDe
                   <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Item</th>
                   <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">SKU</th>
                   <th className="text-center py-3 px-4 text-sm font-semibold text-slate-700">Units</th>
+                  <th className="text-center py-3 px-4 text-sm font-semibold text-slate-700 print:hidden">Fulfilled</th>
                   <th className="text-right py-3 px-4 text-sm font-semibold text-slate-700">Unit Price</th>
                   <th className="text-right py-3 px-4 text-sm font-semibold text-slate-700">Discount</th>
                   <th className="text-right py-3 px-4 text-sm font-semibold text-slate-700">Total</th>
@@ -351,55 +401,82 @@ export default function SellerOrderDetailPage({ orderId, onBack }: SellerOrderDe
                 </tr>
               </thead>
               <tbody>
-                {orderItems.map((item) => (
-                  <tr key={item.id} className="border-b border-slate-100">
-                    <td className="py-4 px-4">
-                      <div className="flex items-center gap-3">
-                        {item.products?.image_url ? (
-                          <img
-                            src={item.products.image_url}
-                            alt={item.products.name}
-                            className="w-12 h-12 rounded-lg object-cover"
-                          />
+                {orderItems.map((item) => {
+                  const fulfilled = fulfilledQuantities[item.id] || 0;
+                  const remaining = getRemainingQuantity(item.id, item.quantity);
+                  const fullyFulfilled = isFullyFulfilled(item.id, item.quantity);
+
+                  return (
+                    <tr key={item.id} className="border-b border-slate-100">
+                      <td className="py-4 px-4">
+                        <div className="flex items-center gap-3">
+                          {item.products?.image_url ? (
+                            <img
+                              src={item.products.image_url}
+                              alt={item.products.name}
+                              className="w-12 h-12 rounded-lg object-cover"
+                            />
+                          ) : (
+                            <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center">
+                              <Package className="w-6 h-6 text-slate-400" />
+                            </div>
+                          )}
+                          <span className="font-medium text-slate-900">{item.products?.name}</span>
+                        </div>
+                      </td>
+                      <td className="py-4 px-4 text-slate-600 text-sm">{item.products?.sku}</td>
+                      <td className="py-4 px-4 text-center font-semibold text-slate-900">{item.quantity}</td>
+                      <td className="py-4 px-4 text-center print:hidden">
+                        {fullyFulfilled ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">
+                            <CheckCircle className="w-3 h-3" />
+                            Complete
+                          </span>
+                        ) : fulfilled > 0 ? (
+                          <span className="text-xs text-amber-600 font-medium">
+                            {fulfilled}/{item.quantity}
+                          </span>
                         ) : (
-                          <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center">
-                            <Package className="w-6 h-6 text-slate-400" />
-                          </div>
+                          <span className="text-xs text-slate-400">0/{item.quantity}</span>
                         )}
-                        <span className="font-medium text-slate-900">{item.products?.name}</span>
-                      </div>
-                    </td>
-                    <td className="py-4 px-4 text-slate-600 text-sm">{item.products?.sku}</td>
-                    <td className="py-4 px-4 text-center font-semibold text-slate-900">{item.quantity}</td>
-                    <td className="py-4 px-4 text-right text-slate-900">
-                      ${parseFloat(item.unit_price).toFixed(2)}
-                    </td>
-                    <td className="py-4 px-4 text-right text-slate-900">
-                      {item.discount_percentage > 0 ? (
-                        <span className="text-red-600">
-                          -{item.discount_percentage}% (${parseFloat(item.discount_amount).toFixed(2)})
-                        </span>
-                      ) : (
-                        <span className="text-slate-500">-</span>
-                      )}
-                    </td>
-                    <td className="py-4 px-4 text-right font-semibold text-slate-900">
-                      ${parseFloat(item.line_total).toFixed(2)}
-                    </td>
-                    <td className="py-4 px-4 text-center print:hidden">
-                      <button
-                        onClick={() => {
-                          setSelectedOrderItem(item);
-                          setShowFulfillmentModal(true);
-                        }}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 transition"
-                      >
-                        <Truck className="w-3 h-3" />
-                        Fulfill
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="py-4 px-4 text-right text-slate-900">
+                        ${parseFloat(item.unit_price).toFixed(2)}
+                      </td>
+                      <td className="py-4 px-4 text-right text-slate-900">
+                        {item.discount_percentage > 0 ? (
+                          <span className="text-red-600">
+                            -{item.discount_percentage}% (${parseFloat(item.discount_amount).toFixed(2)})
+                          </span>
+                        ) : (
+                          <span className="text-slate-500">-</span>
+                        )}
+                      </td>
+                      <td className="py-4 px-4 text-right font-semibold text-slate-900">
+                        ${parseFloat(item.line_total).toFixed(2)}
+                      </td>
+                      <td className="py-4 px-4 text-center print:hidden">
+                        {fullyFulfilled ? (
+                          <span className="inline-flex items-center gap-1 px-3 py-1.5 bg-green-100 text-green-700 text-xs font-medium rounded-lg">
+                            <CheckCircle className="w-3 h-3" />
+                            Fulfilled
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              setSelectedOrderItem(item);
+                              setShowFulfillmentModal(true);
+                            }}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 transition"
+                          >
+                            <Truck className="w-3 h-3" />
+                            Fulfill ({remaining})
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -476,6 +553,7 @@ export default function SellerOrderDetailPage({ orderId, onBack }: SellerOrderDe
             setSelectedOrderItem(null);
           }}
           onFulfill={handleFulfillItem}
+          remainingQuantity={getRemainingQuantity(selectedOrderItem.id, selectedOrderItem.quantity)}
         />
       )}
     </div>

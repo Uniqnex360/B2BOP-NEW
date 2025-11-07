@@ -20,7 +20,7 @@ export default function LoginPage() {
     setLoading(true);
 
     const { error } = await signIn(email, password);
-
+    console.log("ERROR",error)
     if (error) {
       setError(error.message || 'Failed to sign in');
     }

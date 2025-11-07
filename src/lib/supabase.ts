@@ -13,6 +13,12 @@ export type UserRole = 'admin' | 'seller' | 'buyer';
 
 export interface UserProfile {
   id: string;
+  phone?:string
+  address?:string
+  city?:string
+  state?:string
+  zip_code?:string
+  country?:string
   email: string;
   first_name: string;
   last_name: string | null;

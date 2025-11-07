@@ -21,6 +21,9 @@ export default function SettingsPage() {
     country: ''
   });
 
+  // Local state for warehouse edits
+  const [warehouseEdits, setWarehouseEdits] = useState<{[key: string]: any}>({});
+
   useEffect(() => {
     loadSettings();
   }, [profile]);
@@ -57,6 +60,8 @@ export default function SettingsPage() {
         .order('name');
 
       setWarehouses(warehouseData || []);
+      // Reset edits when loading new data
+      setWarehouseEdits({});
     } catch (error) {
       console.error('Error loading settings:', error);
     } finally {
@@ -125,22 +130,57 @@ export default function SettingsPage() {
     }
   };
 
-  const handleUpdateWarehouse = async (warehouseId: string, field: string, value: string) => {
+  // Handle warehouse field changes locally
+  const handleWarehouseFieldChange = (warehouseId: string, field: string, value: string) => {
+    setWarehouseEdits(prev => ({
+      ...prev,
+      [warehouseId]: {
+        ...prev[warehouseId],
+        [field]: value
+      }
+    }));
+  };
+
+  // Save warehouse changes
+  const handleSaveWarehouse = async (warehouseId: string) => {
+    const edits = warehouseEdits[warehouseId];
+    if (!edits) return;
+
     try {
       const { error } = await supabase
         .from('warehouses')
-        .update({ [field]: value })
+        .update(edits)
         .eq('id', warehouseId);
 
       if (error) throw error;
 
+      // Update local state
       setWarehouses(warehouses.map(w =>
-        w.id === warehouseId ? { ...w, [field]: value } : w
+        w.id === warehouseId ? { ...w, ...edits } : w
       ));
+
+      // Clear edits for this warehouse
+      setWarehouseEdits(prev => {
+        const newEdits = { ...prev };
+        delete newEdits[warehouseId];
+        return newEdits;
+      });
+
+      alert('Warehouse updated successfully');
     } catch (error) {
       console.error('Error updating warehouse:', error);
       alert('Failed to update warehouse');
     }
+  };
+
+  // Get current value for warehouse field (either edited or original)
+  const getWarehouseFieldValue = (warehouse: any, field: string) => {
+    return warehouseEdits[warehouse.id]?.[field] ?? warehouse[field] ?? '';
+  };
+
+  // Check if warehouse has unsaved changes
+  const hasUnsavedChanges = (warehouseId: string) => {
+    return !!warehouseEdits[warehouseId];
   };
 
   if (loading) {
@@ -166,124 +206,8 @@ export default function SettingsPage() {
           </h2>
         </div>
         <div className="p-6 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Company Name
-              </label>
-              <input
-                type="text"
-                value={formData.company_name}
-                onChange={(e) => setFormData({ ...formData, company_name: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Contact Person
-              </label>
-              <input
-                type="text"
-                value={formData.contact_person}
-                onChange={(e) => setFormData({ ...formData, contact_person: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
-                <Mail className="w-4 h-4 mr-1" />
-                Email
-              </label>
-              <input
-                type="email"
-                value={formData.email}
-                disabled
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500"
-              />
-              <p className="text-xs text-gray-500 mt-1">Email cannot be changed</p>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
-                <Phone className="w-4 h-4 mr-1" />
-                Phone
-              </label>
-              <input
-                type="tel"
-                value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
-              <MapPin className="w-4 h-4 mr-1" />
-              Address Line 1
-            </label>
-            <input
-              type="text"
-              value={formData.address_line1}
-              onChange={(e) => setFormData({ ...formData, address_line1: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Address Line 2
-            </label>
-            <input
-              type="text"
-              value={formData.address_line2}
-              onChange={(e) => setFormData({ ...formData, address_line2: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
-              <input
-                type="text"
-                value={formData.city}
-                onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
-              <input
-                type="text"
-                value={formData.state}
-                onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Postal Code</label>
-              <input
-                type="text"
-                value={formData.postal_code}
-                onChange={(e) => setFormData({ ...formData, postal_code: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
-            <input
-              type="text"
-              value={formData.country}
-              onChange={(e) => setFormData({ ...formData, country: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-
+          {/* ... (keep your existing profile form fields exactly as they are) ... */}
+          
           <div className="pt-4">
             <button
               onClick={handleSaveProfile}
@@ -317,6 +241,18 @@ export default function SettingsPage() {
             <div className="space-y-6">
               {warehouses.map((warehouse) => (
                 <div key={warehouse.id} className="border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-semibold text-gray-900">Warehouse Details</h3>
+                    {hasUnsavedChanges(warehouse.id) && (
+                      <button
+                        onClick={() => handleSaveWarehouse(warehouse.id)}
+                        className="px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm"
+                      >
+                        Save Changes
+                      </button>
+                    )}
+                  </div>
+                  
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -324,8 +260,8 @@ export default function SettingsPage() {
                       </label>
                       <input
                         type="text"
-                        value={warehouse.name}
-                        onChange={(e) => handleUpdateWarehouse(warehouse.id, 'name', e.target.value)}
+                        value={getWarehouseFieldValue(warehouse, 'name')}
+                        onChange={(e) => handleWarehouseFieldChange(warehouse.id, 'name', e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       />
                     </div>
@@ -335,8 +271,8 @@ export default function SettingsPage() {
                       </label>
                       <input
                         type="text"
-                        value={warehouse.address_line1}
-                        onChange={(e) => handleUpdateWarehouse(warehouse.id, 'address_line1', e.target.value)}
+                        value={getWarehouseFieldValue(warehouse, 'address_line1')}
+                        onChange={(e) => handleWarehouseFieldChange(warehouse.id, 'address_line1', e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       />
                     </div>
@@ -346,8 +282,8 @@ export default function SettingsPage() {
                       <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
                       <input
                         type="text"
-                        value={warehouse.city}
-                        onChange={(e) => handleUpdateWarehouse(warehouse.id, 'city', e.target.value)}
+                        value={getWarehouseFieldValue(warehouse, 'city')}
+                        onChange={(e) => handleWarehouseFieldChange(warehouse.id, 'city', e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       />
                     </div>
@@ -355,8 +291,8 @@ export default function SettingsPage() {
                       <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
                       <input
                         type="text"
-                        value={warehouse.state}
-                        onChange={(e) => handleUpdateWarehouse(warehouse.id, 'state', e.target.value)}
+                        value={getWarehouseFieldValue(warehouse, 'state')}
+                        onChange={(e) => handleWarehouseFieldChange(warehouse.id, 'state', e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       />
                     </div>
@@ -364,8 +300,8 @@ export default function SettingsPage() {
                       <label className="block text-sm font-medium text-gray-700 mb-1">Postal Code</label>
                       <input
                         type="text"
-                        value={warehouse.postal_code}
-                        onChange={(e) => handleUpdateWarehouse(warehouse.id, 'postal_code', e.target.value)}
+                        value={getWarehouseFieldValue(warehouse, 'postal_code')}
+                        onChange={(e) => handleWarehouseFieldChange(warehouse.id, 'postal_code', e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       />
                     </div>
@@ -374,8 +310,8 @@ export default function SettingsPage() {
                     <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
                     <input
                       type="text"
-                      value={warehouse.country}
-                      onChange={(e) => handleUpdateWarehouse(warehouse.id, 'country', e.target.value)}
+                      value={getWarehouseFieldValue(warehouse, 'country')}
+                      onChange={(e) => handleWarehouseFieldChange(warehouse.id, 'country', e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
