@@ -9,7 +9,6 @@ import {
   Download,
   Upload,
   Search,
-  Filter,
   Edit,
   Eye,
   EyeOff,
@@ -413,7 +412,7 @@ export default function ProductsPage() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+      <div className="sticky top-0 z-40 bg-white py-6 -mx-6 px-6 shadows-sm flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-slate-900">Products</h1>
           <p className="text-slate-600 mt-1">
@@ -459,7 +458,7 @@ export default function ProductsPage() {
       </div>
 
       {/* Filters and controls */}
-      <div className="bg-white rounded-xl border border-slate-200 p-4">
+      <div className="sticky top-24 z-30   bg-white rounded-xl border border-slate-200 p-4">
         <div className="flex flex-col lg:flex-row gap-4">
           <div className="flex-1 relative">
             <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -585,6 +584,10 @@ export default function ProductsPage() {
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex-1 min-w-0">
                     <h3 className="font-bold text-slate-900 truncate">{product.name}</h3>
+                    <span className="text-lg font-bold text-slate-900">${product.unit_price}</span>
+                  {product.has_variants && product.variant_count > 0 && (
+                    <span className="text-xs text-slate-600">+{product.variant_count} variants</span>
+                  )}
                     <p className="text-sm text-slate-600">SKU: {product.sku}</p>
                   </div>
                 </div>
@@ -603,12 +606,7 @@ export default function ProductsPage() {
                 <p className="text-sm text-slate-600 line-clamp-2 mb-3">
                   {product.description || 'No description'}
                 </p>
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-lg font-bold text-slate-900">${product.unit_price}</span>
-                  {product.has_variants && product.variant_count > 0 && (
-                    <span className="text-xs text-slate-600">+{product.variant_count} variants</span>
-                  )}
-                </div>
+                
                 <div className="flex gap-2">
                   <button
                     onClick={() => setViewingProductId(product.id)}

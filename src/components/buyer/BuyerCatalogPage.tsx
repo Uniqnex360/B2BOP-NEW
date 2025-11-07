@@ -242,7 +242,6 @@ export default function BuyerCatalogPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="sticky top-0 z-40 bg-white py-6 -mx-6 px-6 shadows-sm flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-slate-900">Product Catalog</h1>
@@ -262,7 +261,6 @@ export default function BuyerCatalogPage() {
         </button>
       </div>
 
-      {/* Filters */}
       <div className="sticky top-24 z-30   bg-white rounded-xl border border-slate-200 p-4">
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="relative flex-1">
