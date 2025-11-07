@@ -457,7 +457,6 @@ export default function ProductsPage() {
         </div>
       </div>
 
-      {/* Filters and controls */}
       <div className="sticky top-24 z-30   bg-white rounded-xl border border-slate-200 p-4">
         <div className="flex flex-col lg:flex-row gap-4">
           <div className="flex-1 relative">
@@ -568,12 +567,14 @@ export default function ProductsPage() {
                   onChange={() => toggleProductSelection(product.id)}
                   className="absolute top-4 left-4 w-5 h-5 rounded border-slate-300 z-10"
                 />
-                <img
-                  src={getImageUrl(product.image_url, product.name)}
-                  onError={(e) => handleImageError(e, product.name)}
-                  alt={product.name}
-                  className="w-full h-48 object-cover"
-                />
+                <div className="w-full h-48 overflow-hidden bg-slate-100 flex items-center justify-center">
+  <img
+    src={getImageUrl(product.image_url, product.name)}
+    onError={(e) => handleImageError(e, product.name)}
+    alt={product.name}
+    className="max-w-full max-h-full object-contain"
+  />
+</div>
                 {(!product.is_visible || !product.is_active) && (
                   <div className="absolute top-4 right-4 bg-red-500 text-white px-2 py-1 rounded text-xs font-medium">
                     Hidden
