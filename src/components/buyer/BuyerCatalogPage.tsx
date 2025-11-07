@@ -370,18 +370,19 @@ export default function BuyerCatalogPage() {
                   >
                     {product.name}
                   </h3>
+                  <span className="text-2xl font-bold text-blue-600">
+                        ${product.unit_price.toFixed(2)}
+                      </span>
+                      {product.has_variants && product.variant_count > 0 && (
+                        <span className="ml-2 text-xs text-slate-600">+{product.variant_count} variants</span>
+                      )}
                   <p className="text-xs text-slate-500 mb-2">SKU: {product.sku}</p>
                   <p className="text-sm text-slate-600 mb-3 line-clamp-2">
                     {product.description}
                   </p>
                   <div className="flex items-baseline justify-between mb-3">
                     <div>
-                      <span className="text-2xl font-bold text-blue-600">
-                        ${product.unit_price.toFixed(2)}
-                      </span>
-                      {product.has_variants && product.variant_count > 0 && (
-                        <span className="ml-2 text-xs text-slate-600">+{product.variant_count} variants</span>
-                      )}
+                      
                     </div>
                   </div>
 
