@@ -1,19 +1,32 @@
-import { useState } from 'react';
+import { useState,useEffect} from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { ArrowLeft, CreditCard, Wallet, Building, DollarSign, Truck } from 'lucide-react';
+import { CardElement, Elements, useElements, useStripe } from '@stripe/react-stripe-js';
+import { stripePromise } from '../../lib/stripeConfig';
 
 interface CheckoutPageProps {
   cart: any[];
   onBack: () => void;
   onSuccess: () => void;
 }
-
-export default function CheckoutPage({ cart, onBack, onSuccess }: CheckoutPageProps) {
+export default function CheckoutWrapperPage(props:CheckoutPageProps)
+{
+  return (
+    <Elements stripe={stripePromise}>
+      <CheckoutPage {...props}/>
+    </Elements>
+  )
+}
+export  function CheckoutPage({ cart, onBack, onSuccess }: CheckoutPageProps) {
+  const stripe=useStripe()
+  const elements=useElements()
   const { profile } = useAuth();
   const [paymentMethod, setPaymentMethod] = useState<string>('');
   const [loading, setLoading] = useState(false);
+  const [buyerAddress,setBuyerAddress]=useState<any>(null)
   const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const [loadingAddress,setLoadingAddress]=useState(true)
 
   // Payment form states
   const [cardNumber, setCardNumber] = useState('');
@@ -32,10 +45,25 @@ export default function CheckoutPage({ cart, onBack, onSuccess }: CheckoutPagePr
     { id: 'paypal', name: 'PayPal', icon: Wallet, description: 'Pay with PayPal account' },
     { id: 'netbanking', name: 'Net Banking', icon: Building, description: 'Pay via online banking' },
     { id: 'card', name: 'Debit/Credit Card', icon: CreditCard, description: 'Direct card payment' },
-    { id: 'cod', name: 'Cash on Delivery', icon: DollarSign, description: 'Pay when you receive' },
     { id: 'credit', name: 'Credit Terms', icon: Truck, description: 'Use credit limit' },
   ];
+ 
+  useEffect(()=>{
+    const fetchAddress=async()=>{
+      if(!profile?.id)return
+      setLoadingAddress(true)
+     const { data, error } = await supabase.from('buyer_addresses').select('*').eq('buyer_id', profile.id).eq('is_default', true).maybeSingle();
+     console.log('dataatata',data)
+      if(!error && data)
+      {
+        setBuyerAddress(data)
+      }
+      setLoadingAddress(false)
+    }
+    fetchAddress()
 
+  },[profile])
+   
   const handlePaymentMethodSelect = (method: string) => {
     setPaymentMethod(method);
     if (method === 'cod' || method === 'credit') {
@@ -43,14 +71,149 @@ export default function CheckoutPage({ cart, onBack, onSuccess }: CheckoutPagePr
     } else {
       setShowPaymentForm(true);
     }
-  };
+  }; 
+  if (loadingAddress) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-slate-600">Loading...</div>
+      </div>
+    );
+  }
+
+  if (!buyerAddress ) {
+  return (
+    <div className="p-8 text-center">
+      <h2 className="text-xl font-semibold mb-2">Address Missing</h2>
+      <p className="text-slate-600 mb-4">
+        Please add a default shipping address before checking out.
+      </p>
+      <button
+        onClick={onBack}
+        className="px-4 py-2 bg-slate-900 text-white rounded-lg"
+      >
+        Go Back
+      </button>
+    </div>
+  );
+}
+
+  const handleStripePayment=async()=>{
+    if(!stripe || !elements)
+    {
+      alert("Stripe has not loaded properly!")
+      return
+    }
+    try {
+      const {data,error:paymentIntentError}=await supabase.functions.invoke('create-payment-intent',{
+        body:JSON.stringify({
+          amount:Math.round(total*100),
+          currency:"usd"
+        })
+      })
+      if(paymentIntentError)
+      {
+        throw paymentIntentError
+      }
+      const cardElement=elements.getElement(CardElement)
+      const address = {
+  line1: buyerAddress?.address_line1?.trim() || 'N/A',
+  city: buyerAddress?.city?.replace(/,$/, '').trim() || 'N/A',
+  state: buyerAddress?.state?.trim() || 'N/A',
+  postal_code: buyerAddress?.postal_code?.trim() || '00000', 
+  country: buyerAddress?.country?.trim() === 'USA' ? 'US' : buyerAddress?.country?.trim() || 'US',
+};
+            console.log('Stripe billing address:', address);
+
+
+      const {error,paymentIntent}=await stripe.confirmCardPayment(data.clientSecret,{
+        payment_method:{
+          card:cardElement!,
+          billing_details:{
+            name:cardName||buyerAddress?.full_name||profile?.full_name,
+            email:profile?.email,
+            phone:buyerAddress?.phone,
+            address,
+
+          }
+        }
+      })
+
+      if(error)
+      {
+        throw error
+      }
+      console.log('Client Secret:', data.clientSecret);
+      if(paymentIntent && paymentIntent.status==='succeeded')
+      {
+        const orderNumber = 'ORD-' + Date.now().toString().slice(-8);
+         const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .insert({
+          order_number: orderNumber,
+          buyer_id: profile!.id,
+          seller_id: profile!.seller_id,
+          status: 'pending',
+          payment_status: 'paid',
+          subtotal: subtotal,
+          payment_intent_id: paymentIntent.id,
+          tax_amount: tax,
+          total_amount: total,
+          notes: `Payment method: ${paymentMethod}`,
+        })
+        .select()
+        .single();
+
+      if (orderError) throw orderError;
+       const orderItems = cart.map((item) => ({
+        order_id: order.id,
+        product_id: item.product_id,
+        quantity: item.quantity,
+        unit_price: item.product.unit_price,
+        line_total: item.product.unit_price * item.quantity,
+      }));
+
+      const { error: itemsError } = await supabase.from('order_items').insert(orderItems);
+
+      if (itemsError) throw itemsError;
+       for (const item of cart) {
+        const { data: product } = await supabase
+          .from('products')
+          .select('stock_quantity')
+          .eq('id', item.product_id)
+          .single();
+
+        if (product) {
+          await supabase
+            .from('products')
+            .update({ stock_quantity: product.stock_quantity - item.quantity })
+            .eq('id', item.product_id);
+        }
+      }
+
+      alert(`Order placed successfully! Order #${orderNumber}`);
+      onSuccess();
+
+      }
+    } catch (error:any) {
+      console.error(`Payment failed ${error}`)
+      setLoading(false)
+      alert(`Payment failed ${error.message}`)
+    }
+    finally{
+      setLoading(false)
+    }
+  }
 
   const handlePlaceOrder = async () => {
     if (!paymentMethod) {
       alert('Please select a payment method');
       return;
     }
-
+    setLoading(true);
+    if (paymentMethod === 'stripe') {
+      await handleStripePayment();
+      return;
+    }
     // Validate payment forms if needed
     if (showPaymentForm && paymentMethod !== 'cod' && paymentMethod !== 'credit') {
       if (paymentMethod === 'card' || paymentMethod === 'stripe') {
@@ -71,8 +234,7 @@ export default function CheckoutPage({ cart, onBack, onSuccess }: CheckoutPagePr
       }
     }
 
-    setLoading(true);
-
+    
     try {
       // Generate order number
       const orderNumber = 'ORD-' + Date.now().toString().slice(-8);
@@ -87,7 +249,6 @@ export default function CheckoutPage({ cart, onBack, onSuccess }: CheckoutPagePr
         // For online payments, mark as paid (in real app, wait for payment gateway response)
         paymentStatus = 'paid';
       }
-
       // Create order
       const { data: order, error: orderError } = await supabase
         .from('orders')
@@ -140,6 +301,7 @@ export default function CheckoutPage({ cart, onBack, onSuccess }: CheckoutPagePr
       onSuccess();
     } catch (err: any) {
       alert('Failed to place order: ' + err.message);
+      setLoading(false);
     } finally {
       setLoading(false);
     }
@@ -192,53 +354,11 @@ export default function CheckoutPage({ cart, onBack, onSuccess }: CheckoutPagePr
           {showPaymentForm && paymentMethod === 'stripe' && (
             <div className="bg-white rounded-xl border border-slate-200 p-6">
               <h2 className="text-lg font-semibold text-slate-900 mb-4">Stripe Payment</h2>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Card Number</label>
-                  <input
-                    type="text"
-                    value={cardNumber}
-                    onChange={(e) => setCardNumber(e.target.value)}
-                    placeholder="1234 5678 9012 3456"
-                    maxLength={19}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Cardholder Name</label>
-                  <input
-                    type="text"
-                    value={cardName}
-                    onChange={(e) => setCardName(e.target.value)}
-                    placeholder="John Doe"
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Expiry Date</label>
-                    <input
-                      type="text"
-                      value={cardExpiry}
-                      onChange={(e) => setCardExpiry(e.target.value)}
-                      placeholder="MM/YY"
-                      maxLength={5}
-                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">CVV</label>
-                    <input
-                      type="text"
-                      value={cardCVV}
-                      onChange={(e) => setCardCVV(e.target.value)}
-                      placeholder="123"
-                      maxLength={3}
-                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-900 focus:border-transparent"
-                    />
-                  </div>
-                </div>
+              <label className='block text-sm font-medium text-slate-700 mb-2'>Card Details</label>
+              <div className='border border-slate-300  rounded-lg p-3'>
+                <CardElement options={{ style: { base: { fontSize: '14px' } }, hidePostalCode: true }} />
               </div>
+  
             </div>
           )}
 
@@ -347,21 +467,6 @@ export default function CheckoutPage({ cart, onBack, onSuccess }: CheckoutPagePr
             </div>
           )}
 
-          {paymentMethod === 'cod' && (
-            <div className="bg-white rounded-xl border border-slate-200 p-6">
-              <h2 className="text-lg font-semibold text-slate-900 mb-4">Cash on Delivery</h2>
-              <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <p className="text-sm text-yellow-800 mb-2">
-                  <strong>Note:</strong> You will pay in cash when the order is delivered to you.
-                </p>
-                <ul className="text-sm text-yellow-700 space-y-1 ml-4 list-disc">
-                  <li>Keep exact amount ready for faster delivery</li>
-                  <li>Payment is collected by delivery personnel</li>
-                  <li>Inspect products before payment</li>
-                </ul>
-              </div>
-            </div>
-          )}
 
           {paymentMethod === 'credit' && (
             <div className="bg-white rounded-xl border border-slate-200 p-6">
@@ -413,7 +518,7 @@ export default function CheckoutPage({ cart, onBack, onSuccess }: CheckoutPagePr
             </div>
             <button
               onClick={handlePlaceOrder}
-              disabled={!paymentMethod || loading}
+              disabled={!paymentMethod || loading||(paymentMethod==='stripe' && !stripe||!elements)}
               className="w-full mt-6 px-4 py-3 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'Placing Order...' : 'Place Order'}

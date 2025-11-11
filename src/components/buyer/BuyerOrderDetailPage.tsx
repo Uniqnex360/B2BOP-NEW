@@ -152,11 +152,11 @@ export default function BuyerOrderDetailPage({ orderId, onBack, onNavigate }: Bu
             </div>
           </div>
           <div className="text-right">
-            <div className="w-20 h-20 bg-blue-600 rounded-xl flex items-center justify-center mb-2">
+            {/* <div className="w-20 h-20 bg-blue-600 rounded-xl flex items-center justify-center mb-2">
               <span className="text-2xl font-bold text-white">B2B</span>
-            </div>
-            <p className="text-sm font-semibold text-slate-900">{seller?.business_name || seller?.company_name}</p>
-            <p className="text-xs text-slate-600">{seller?.email}</p>
+            </div> */}
+            {/* <p className="text-sm font-semibold text-slate-900">{seller?.business_name || seller?.company_name}</p>
+            <p className="text-xs text-slate-600">{seller?.email}</p> */}
           </div>
         </div>
 

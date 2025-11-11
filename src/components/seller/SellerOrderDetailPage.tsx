@@ -313,11 +313,11 @@ export default function SellerOrderDetailPage({ orderId, onBack }: SellerOrderDe
             </div>
           </div>
           <div className="text-right">
-            <div className="w-20 h-20 bg-blue-600 rounded-xl flex items-center justify-center mb-2">
+            {/* <div className="w-20 h-20 bg-blue-600 rounded-xl flex items-center justify-center mb-2">
               <span className="text-2xl font-bold text-white">B2B</span>
-            </div>
-            <p className="text-sm font-semibold text-slate-900">{profile?.business_name}</p>
-            <p className="text-xs text-slate-600">{profile?.email}</p>
+            </div> */}
+            {/* <p className="text-sm font-semibold text-slate-900">{profile?.business_name}</p>
+            <p className="text-xs text-slate-600">{profile?.email}</p> */}
           </div>
         </div>
 

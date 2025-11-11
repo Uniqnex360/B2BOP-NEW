@@ -149,7 +149,7 @@ export default function Layout({ children, currentPage, onNavigate }: LayoutProp
                 <p className="font-medium text-slate-900 text-sm truncate">
                   {profile?.first_name} {profile?.last_name}
                 </p>
-                <p className="text-xs text-slate-600 truncate">{profile?.email}</p>
+                {/* <p className="text-xs text-slate-600 truncate">{profile?.email}</p> */}
               </div>
             </div>
             <button

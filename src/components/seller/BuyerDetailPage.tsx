@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { ArrowLeft, Plus, Trash2, Edit2, CreditCard, TrendingUp, Package, ShoppingBag } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Edit2, CreditCard, TrendingUp, Package, ShoppingBag,MapPin } from 'lucide-react';
 
 interface BuyerDetailPageProps {
   buyerId: string;
@@ -11,6 +11,7 @@ interface BuyerDetailPageProps {
 export default function BuyerDetailPage({ buyerId, onBack }: BuyerDetailPageProps) {
   const { profile } = useAuth();
   const [buyer, setBuyer] = useState<any>(null);
+  const [address, setAddress] = useState<any>(null);
   const [creditTerms, setCreditTerms] = useState<any>(null);
   const [discounts, setDiscounts] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
@@ -33,8 +34,9 @@ export default function BuyerDetailPage({ buyerId, onBack }: BuyerDetailPageProp
   const loadData = async () => {
     setLoading(true);
 
-    const [buyerRes, creditRes, discountsRes, categoriesRes, brandsRes, productsRes, ordersRes] = await Promise.all([
+    const [buyerRes,addressRes, creditRes, discountsRes, categoriesRes, brandsRes, productsRes, ordersRes] = await Promise.all([
       supabase.from('user_profiles').select('*').eq('id', buyerId).single(),
+      supabase.from('buyer_addresses').select('*').eq('buyer_id', buyerId).eq('is_default', true).maybeSingle(),
       supabase.from('buyer_credit_terms').select('*').eq('buyer_id', buyerId).eq('seller_id', profile!.id).maybeSingle(),
       supabase.from('buyer_discounts').select('*, categories(name), brands(name), products(name, sku)').eq('buyer_id', buyerId),
       supabase.from('categories').select('*').eq('seller_id', profile!.id).eq('is_active', true),
@@ -44,6 +46,7 @@ export default function BuyerDetailPage({ buyerId, onBack }: BuyerDetailPageProp
     ]);
 
     setBuyer(buyerRes.data);
+    setAddress(addressRes.data)
     setCreditTerms(creditRes.data);
     setDiscounts(discountsRes.data || []);
     setCategories(categoriesRes.data || []);
@@ -52,7 +55,7 @@ export default function BuyerDetailPage({ buyerId, onBack }: BuyerDetailPageProp
     setOrders(ordersRes.data || []);
     setLoading(false);
   };
-
+  console.log('address',address)
   const handleAddDiscount = async () => {
     if (!newDiscount.targetId || !newDiscount.percentage) {
       alert('Please fill all fields');
@@ -175,7 +178,7 @@ export default function BuyerDetailPage({ buyerId, onBack }: BuyerDetailPageProp
       {activeTab === 'details' ? (
         <>
       {/* Credit Terms Card */}
-      <div className="bg-white rounded-xl border border-slate-200 p-6">
+      {/* <div className="bg-white rounded-xl border border-slate-200 p-6">
         <div className="flex items-center gap-3 mb-4">
           <CreditCard className="w-6 h-6 text-slate-700" />
           <h2 className="text-xl font-bold text-slate-900">Credit Terms</h2>
@@ -202,7 +205,31 @@ export default function BuyerDetailPage({ buyerId, onBack }: BuyerDetailPageProp
             </span>
           </div>
         </div>
-      </div>
+      </div> */}
+      <div className="bg-white rounded-xl border border-slate-200 p-6">
+  <div className="flex items-center gap-3 mb-4">
+    <MapPin className="w-6 h-6 text-slate-700" />
+    <h2 className="text-xl font-bold text-slate-900">Address</h2>
+  </div>
+  {address ? (
+    <div className="text-slate-900 space-y-1">
+      <p className="font-medium">{address.full_name}</p>
+      <p>{address.phone}</p>
+      <p>
+        {address.address_line1}
+        {address.address_line2 ? `, ${address.address_line2}` : ''}
+      </p>
+      <p>
+        {address.city}, {address.state} {address.postal_code}
+      </p>
+      <p>{address.country}</p>
+    </div>
+  ) : (
+    <p className="text-slate-600">No address found</p>
+  )}
+</div>
+
+
 
       {/* Discounts Section */}
       <div className="bg-white rounded-xl border border-slate-200 p-6">

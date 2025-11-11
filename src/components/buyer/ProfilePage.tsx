@@ -10,11 +10,13 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [errors,setErrors]=useState("")
   const [newAddress, setNewAddress] = useState({
     address_type: 'shipping',
     street_address: '',
     city: '',
     state: '',
+    phone:"",
     postal_code: '',
     country: 'USA',
     is_default: false,
@@ -24,7 +26,15 @@ export default function ProfilePage() {
     last_four: '',
     is_default: false,
   });
-
+  const validatePhone=(phone:string)=>{
+    const cleaned=phone.replace(/\D/g, '');
+    if (!cleaned)return "Phone number is required!"
+    if(cleaned.length<10||cleaned.length>15)
+    {
+      return "Phone number must be between 10 and 15 digits!"
+    }
+    return ""
+  }
   useEffect(() => {
     loadProfile();
   }, [profile]);
@@ -65,10 +75,25 @@ export default function ProfilePage() {
 
   const handleSaveAddress = async () => {
     if (!profile?.id) return;
-
+    const phoneError=validatePhone(newAddress.phone)
+    if(phoneError)
+    {
+      setErrors({phone:phoneError})
+      return
+    }
+    setErrors({})
+      const full_name = `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim();
     await supabase.from('buyer_addresses').insert({
-      ...newAddress,
-      buyer_id: profile.id,
+      buyer_id:profile.id,
+      full_name:full_name,
+      phone:newAddress.phone,
+      address_line1:newAddress.street_address,
+      city:newAddress.city,
+      state:newAddress.state,
+      postal_code:newAddress.postal_code,
+      country:newAddress.country,
+      is_default:newAddress.is_default,
+      address_type:newAddress.address_type
     });
 
     setShowAddressModal(false);
@@ -79,6 +104,7 @@ export default function ProfilePage() {
       state: '',
       postal_code: '',
       country: 'USA',
+      phone: '', 
       is_default: false,
     });
     loadProfile();
@@ -299,6 +325,23 @@ export default function ProfilePage() {
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
               </div>
+               <div>
+  <label className="block text-sm font-medium text-slate-700 mb-1">
+    Phone Number
+  </label>
+  <input
+    type="tel"
+    value={newAddress.phone}
+    onChange={(e) => setNewAddress({ ...newAddress, phone: e.target.value })}
+    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+      errors.phone ? 'border-red-500' : 'border-slate-300'
+    }`}
+    placeholder="(555) 123-4567"
+  />
+  {errors.phone && (
+    <p className="text-red-600 text-sm mt-1">{errors.phone}</p>
+  )}
+</div>
 
               <div className="flex items-center gap-2">
                 <input
