@@ -61,10 +61,11 @@ export default function BuyerOrderDetailPage({ orderId, onBack, onNavigate }: Bu
     setOrderItems(itemsRes.data || []);
     setLoading(false);
   };
-
   const handlePrint = () => {
     window.print();
   };
+  console.log("ORDERRES",order)
+
 
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {

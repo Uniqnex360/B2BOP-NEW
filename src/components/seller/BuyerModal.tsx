@@ -19,6 +19,15 @@ export default function BuyerModal({ onClose, onSuccess }: BuyerModalProps) {
     companyName: '',
     creditDays: '30',
     creditLimit: '',
+    // Address fields
+    phone: '',
+    addressLine1: '',
+    addressLine2: '',
+    city: '',
+    state: '',
+    postalCode: '',
+    country: 'USA',
+    addressType: 'billing',
   });
 
   const handleSubmit = async (e: FormEvent) => {
@@ -45,6 +54,13 @@ export default function BuyerModal({ onClose, onSuccess }: BuyerModalProps) {
           company_name: formData.companyName || null,
           seller_id: profile!.id,
           is_active: true,
+          phone: formData.phone || null,
+          address: formData.addressLine1 || null,
+          address_line2: formData.addressLine2 || null,
+          city: formData.city || null,
+          state: formData.state || null,
+          zip_code: formData.postalCode || null,
+          country: formData.country || null,
         });
 
         if (profileError) throw profileError;
@@ -58,6 +74,25 @@ export default function BuyerModal({ onClose, onSuccess }: BuyerModalProps) {
         });
 
         if (creditError) throw creditError;
+
+        // Add address to addresses table
+        if (formData.addressLine1) {
+          const { error: addressError } = await supabase.from('buyer_addresses').insert({
+            buyer_id: authData.user.id,
+            full_name: `${formData.firstName} ${formData.lastName}`.trim(),
+            phone: formData.phone || null,
+            address_line1: formData.addressLine1,
+            address_line2: formData.addressLine2 || null,
+            city: formData.city,
+            state: formData.state,
+            postal_code: formData.postalCode,
+            country: formData.country,
+            address_type: formData.addressType,
+            is_default: true,
+          });
+
+          if (addressError) throw addressError;
+        }
       }
 
       onSuccess();
@@ -70,8 +105,8 @@ export default function BuyerModal({ onClose, onSuccess }: BuyerModalProps) {
 
   return (
     <div className="fixed inset-0 bg-blue-600/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl max-w-2xl w-full">
-        <div className="flex items-center justify-between p-6 border-b border-slate-200">
+      <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-6 border-b border-slate-200 sticky top-0 bg-white">
           <h2 className="text-2xl font-bold text-slate-900">Onboard New Buyer</h2>
           <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-lg">
             <X className="w-5 h-5" />
@@ -141,6 +176,105 @@ export default function BuyerModal({ onClose, onSuccess }: BuyerModalProps) {
               onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
               className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
+          </div>
+
+          {/* Address Section */}
+          <div className="border-t border-slate-200 pt-6">
+            <h3 className="text-lg font-semibold text-slate-900 mb-4">Billing Address</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Phone</label>
+                <input
+                  type="tel"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="+1 (555) 123-4567"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Address Line 1
+                </label>
+                <input
+                  type="text"
+                  value={formData.addressLine1}
+                  onChange={(e) => setFormData({ ...formData, addressLine1: e.target.value })}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Street address, P.O. box, company name"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Address Line 2
+                </label>
+                <input
+                  type="text"
+                  value={formData.addressLine2}
+                  onChange={(e) => setFormData({ ...formData, addressLine2: e.target.value })}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Apartment, suite, unit, building, floor, etc."
+                />
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    City
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.city}
+                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    State
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.state}
+                    onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="CA"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    ZIP Code
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.postalCode}
+                    onChange={(e) => setFormData({ ...formData, postalCode: e.target.value })}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="12345"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Country
+                </label>
+                <select
+                  value={formData.country}
+                  onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="USA">United States</option>
+                  <option value="CAN">Canada</option>
+                  <option value="MEX">Mexico</option>
+                  <option value="GBR">United Kingdom</option>
+                </select>
+              </div>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
