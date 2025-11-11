@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../contexts/AuthContext";
+import {PieChart} from './PieChart'
 import {
   DollarSign,
   Package,
@@ -32,20 +33,15 @@ export default function SellerDashboard() {
   const [categoryOrdersData, setCategoryOrdersData] = useState<any[]>([]);
   const [brandOrdersData, setBrandOrdersData] = useState<any[]>([]);
 
-  const categoryOrders: Record<
-    string,
-    { name: string; orders: number; revenue: number }
-  > = {};
-  const brandOrders: Record<
-    string,
-    { name: string; orders: number; revenue: number }
-  > = {};
+  
   useEffect(() => {
     loadDashboardData();
   }, [profile, timeRange]);
 
   const loadDashboardData = async () => {
     if (!profile?.id) return;
+    const categoryOrders: Record<string, { name: string; orders: number; revenue: number }> = {};
+    const brandOrders: Record<string, { name: string; orders: number; revenue: number }> = {};
 
     setLoading(true);
 
@@ -56,14 +52,14 @@ export default function SellerDashboard() {
     try {
       const { data: orders } = await supabase
         .from("orders")
-        .select("*, order_items(*, products(name, sku, cost_price))")
+         .select(`*,order_items(*,products(name,sku,cost_price,brand_id,category_id,brands(name),categories(name)))`)
         .eq("seller_id", profile.id)
         .gte("created_at", startDate.toISOString())
         .order("created_at", { ascending: true });
 
       let totalRevenue = 0;
       let totalCost = 0;
-
+      console.log("ORDERS",orders)
       orders?.forEach((order) => {
         totalRevenue += parseFloat(order.total_amount || 0);
 
@@ -166,7 +162,7 @@ export default function SellerDashboard() {
       orders?.forEach((order) => {
         order.order_items?.forEach((item: any) => {
           const productId = item.product_id;
-          const categoryName = item.products?.category_name || "Unknown";
+           const categoryName = item.products?.categories?.name || "Unknown";
           if (!categoryOrders[categoryName])
             categoryOrders[categoryName] = {
               name: categoryName,
@@ -178,7 +174,7 @@ export default function SellerDashboard() {
             item.line_total || 0
           );
 
-          const brandName = item.products?.brand_name || "Unknown";
+          const brandName = item.products?.brands?.name || "Unknown";
           if (!brandOrders[brandName])
             brandOrders[brandName] = { name: brandName, orders: 0, revenue: 0 };
           brandOrders[brandName].orders += item.quantity;
@@ -447,84 +443,6 @@ export default function SellerDashboard() {
             </div>
           )}
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-white rounded-xl border border-slate-200 p-6">
-            <h2 className="text-xl font-semibold text-slate-900 mb-4">
-              Top categories
-            </h2>
-            {categoryOrdersData.length === 0 ? (
-              <div className="text-center py-8 text-slate-600">
-                No category data available!
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {categoryOrdersData.map((category, index) => {
-                  const maxOrders = Math.max(
-                    ...categoryOrdersData.map((d) => d.orders),
-                    1
-                  );
-                  return (
-                    <div key={index} className="flex items-center gap-3">
-                      <div className="w-24 text-xs text-slate-600 font-medium truncate">
-                        {category.name}
-                      </div>
-                      <div className="flex-1 bg-slate-100 rounded-full h-6 overflow-hidden">
-                        <div
-                          className="bg-blue-500 h-full rounded-full transition-all"
-                          style={{ width: `${(category.orders / maxOrders) * 100}%` }}
-
-                        />
-                      </div>
-                      <div className="w-12 text-right text-xs font-semibold text-slate-900">
-                        {category.orders}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-white rounded-xl border border-slate-200 p-6">
-            <h2 className="text-xl font-semibold text-slate-900 mb-4">
-              Top Brands
-            </h2>
-            {brandOrdersData.length === 0 ? (
-              <div className="text-center py-8 text-slate-600">
-                No brand data available!
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {brandOrdersData.map((brand, index) => {
-                  const maxOrders = Math.max(
-                    ...brandOrdersData.map((d) => d.orders),
-                    1
-                  );
-                  return (
-                    <div key={index} className="flex items-center gap-3">
-                      <div className="w-24 text-xs text-slate-600 font-medium truncate">
-                        {brand.name}
-                      </div>
-                      <div className="flex-1 bg-slate-100 rounded-full h-6 overflow-hidden">
-                        <div
-                          className="bg-blue-500 h-full rounded-full transition-all"
-                          style={{
-                            width: `${(brand.orders / maxOrders) * 100}%`,
-                          }}
-                        />
-                      </div>
-                      <div className="w-12 text-right text-xs font-semibold text-slate-900">
-                        {brand.orders}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-
         <div className="bg-white rounded-xl border border-slate-200 p-6">
           <div className="flex items-center gap-2 mb-6">
             <BarChart3 className="w-5 h-5 text-emerald-600" />
@@ -572,6 +490,86 @@ export default function SellerDashboard() {
             </div>
           )}
         </div>
+        <div className="w-full max-w-full">
+  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    {/* Top Categories */}
+    <div className="bg-white rounded-xl border border-slate-200 p-6">
+      <h2 className="text-xl font-semibold text-slate-900 mb-4">
+        Top Categories
+      </h2>
+      {categoryOrdersData.length === 0 ? (
+        <div className="text-center py-8 text-slate-600">
+          No category data available!
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <PieChart data={categoryOrdersData} title="Top Categories" />
+        </div>
+      )}
+    </div>
+
+    {/* Top Brands */}
+    <div className="bg-white rounded-xl border border-slate-200 p-6">
+      <h2 className="text-xl font-semibold text-slate-900 mb-4">
+        Top Brands
+      </h2>
+      {brandOrdersData.length === 0 ? (
+        <div className="text-center py-8 text-slate-600">
+          No brand data available!
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <PieChart data={brandOrdersData} title="Top Brands" />
+        </div>
+      )}
+    </div>
+  </div>
+</div>
+
+ <div className="bg-white rounded-xl border border-slate-200 p-6">
+        <div className="flex items-center gap-2 mb-6">
+          <ShoppingCart className="w-5 h-5 text-blue-600" />
+          <h2 className="text-xl font-semibold text-slate-900">
+            Orders Volume Trend
+          </h2>
+        </div>
+        {ordersData.length === 0 ? (
+          <div className="text-center py-12 text-slate-600">
+            No orders data for this period
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {ordersData.map((item, index) => (
+              <div key={index} className="flex items-center gap-4">
+                <div className="w-20 text-sm text-slate-600 font-medium">
+                  {item.date}
+                </div>
+                <div className="flex-1 flex items-center gap-3">
+                  <div className="flex-1 bg-slate-100 rounded-full h-10 overflow-hidden">
+                    <div
+                      className="bg-gradient-to-r from-blue-500 to-blue-600 h-full rounded-full flex items-center justify-center transition-all"
+                      style={{
+                        width: `${Math.max(
+                          (item.orders / maxOrders) * 100,
+                          5
+                        )}%`,
+                      }}
+                    >
+                      <span className="text-white text-sm font-bold">
+                        {item.orders}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="text-xs text-slate-500 w-24">
+                    ${item.revenue.toFixed(0)} rev
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+        
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -663,49 +661,7 @@ export default function SellerDashboard() {
           )}
         </div>
       </div>
-      <div className="bg-white rounded-xl border border-slate-200 p-6">
-        <div className="flex items-center gap-2 mb-6">
-          <ShoppingCart className="w-5 h-5 text-blue-600" />
-          <h2 className="text-xl font-semibold text-slate-900">
-            Orders Volume Trend
-          </h2>
-        </div>
-        {ordersData.length === 0 ? (
-          <div className="text-center py-12 text-slate-600">
-            No orders data for this period
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {ordersData.map((item, index) => (
-              <div key={index} className="flex items-center gap-4">
-                <div className="w-20 text-sm text-slate-600 font-medium">
-                  {item.date}
-                </div>
-                <div className="flex-1 flex items-center gap-3">
-                  <div className="flex-1 bg-slate-100 rounded-full h-10 overflow-hidden">
-                    <div
-                      className="bg-gradient-to-r from-blue-500 to-blue-600 h-full rounded-full flex items-center justify-center transition-all"
-                      style={{
-                        width: `${Math.max(
-                          (item.orders / maxOrders) * 100,
-                          5
-                        )}%`,
-                      }}
-                    >
-                      <span className="text-white text-sm font-bold">
-                        {item.orders}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="text-xs text-slate-500 w-24">
-                    ${item.revenue.toFixed(0)} rev
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+     
     </div>
   );
 }
