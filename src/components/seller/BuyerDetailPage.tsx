@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { ArrowLeft, Plus, Trash2, Edit2, CreditCard, TrendingUp, Package, ShoppingBag, MapPin, X } from 'lucide-react';
-
+import OrderDetailPage from './OrderDetail'
 interface BuyerDetailPageProps {
   buyerId: string;
   onBack: () => void;
@@ -13,6 +13,7 @@ interface BuyerDetailPageProps {
 export default function BuyerDetailPage({ buyerId, onBack,onNavigateToOrder }: BuyerDetailPageProps) {
   const { profile } = useAuth();
   const [buyer, setBuyer] = useState<any>(null);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [address, setAddress] = useState<any>(null);
   const [creditTerms, setCreditTerms] = useState<any>(null);
   const [discounts, setDiscounts] = useState<any[]>([]);
@@ -28,6 +29,9 @@ export default function BuyerDetailPage({ buyerId, onBack,onNavigateToOrder }: B
     targetId: '',
     percentage: '',
   });
+  const handleNavigateToOrder = (orderId: string) => {
+  setSelectedOrderId(orderId);
+};
   const [showEditModal, setShowEditModal] = useState(false);
   const [editForm, setEditForm] = useState({
     firstName: '',
@@ -236,7 +240,22 @@ export default function BuyerDetailPage({ buyerId, onBack,onNavigateToOrder }: B
       </div>
     );
   }
+  if (selectedOrderId) {
+  return (
+    <div>
+      <button 
+        onClick={() => setSelectedOrderId(null)}
+        className="flex items-center gap-2 mb-4 text-blue-600 hover:text-blue-800"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        Back to Buyer Details
+      </button>
+      {/* Render your order detail component here */}
+     <OrderDetailPage orderId={selectedOrderId} onBack={() => setSelectedOrderId(null)} />
 
+    </div>
+  );
+}
   if (!buyer) {
     return (
       <div className="text-center py-16">
@@ -738,11 +757,11 @@ export default function BuyerDetailPage({ buyerId, onBack,onNavigateToOrder }: B
                     <tr key={order.id} className="border-b border-slate-100 hover:bg-slate-50">
                       <td className="py-4 px-4">
                         <button
-                          onClick={() => onNavigateToOrder?.(order.id)}
-                          className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
-                        >
-                          {order.order_number}
-                        </button>
+  onClick={() => handleNavigateToOrder(order.id)}
+  className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
+>
+  {order.order_number}
+</button>
                       </td>
                       <td className="py-4 px-4 text-slate-700">
                         {new Date(order.created_at).toLocaleDateString()}
