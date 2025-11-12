@@ -56,11 +56,12 @@ export default function BuyerOrderDetailPage({ orderId, onBack, onNavigate }: Bu
         .eq('order_id', orderId)
         .order('created_at')
     ]);
-    
     setOrder(orderRes.data);
     setOrderItems(itemsRes.data || []);
     setLoading(false);
   };
+    console.log("ORDER",order)
+
   const handlePrint = () => {
     window.print();
   };

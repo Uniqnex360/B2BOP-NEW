@@ -218,6 +218,7 @@ export default function SellerOrderDetailPage({ orderId, onBack }: SellerOrderDe
 
   setLoading(false);
 };
+    console.log("ORDER",order)
 
   const getRemainingQuantity = (orderItemId: string, orderedQuantity: number) => {
     const fulfilled = fulfilledQuantities[orderItemId] || 0;

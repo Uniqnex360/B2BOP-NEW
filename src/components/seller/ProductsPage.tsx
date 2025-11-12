@@ -48,7 +48,6 @@ export default function ProductsPage() {
   useEffect(() => {
     filterProducts();
   }, [products, searchTerm, filterStatus, categoryFilter, brandFilter]);
-
   const loadProducts = async () => {
     if (!profile?.id) return;
 
@@ -584,7 +583,12 @@ export default function ProductsPage() {
               <div className="p-4">
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-bold text-slate-900 truncate">{product.name}</h3>
+                     <p 
+        className="font-semibold text-slate-900 mb-1 cursor-pointer hover:text-blue-600 transition" 
+        onClick={() => setViewingProductId(product.id)}
+      >
+        {product.name}
+      </p>
                     <span className="text-lg font-bold text-slate-900">${product.unit_price}</span>
                   {product.has_variants && product.variant_count > 0 && (
                     <span className="text-xs text-slate-600">+{product.variant_count} variants</span>
@@ -664,19 +668,24 @@ export default function ProductsPage() {
                       />
                     </td>
                     <td className="py-4 px-4">
-                      <div className="flex items-center gap-3">
-                        <img
-                          src={getImageUrl(product.image_url, product.name)}
-                          onError={(e) => handleImageError(e, product.name)}
-                          alt={product.name}
-                          className="w-12 h-12 rounded object-cover"
-                        />
-                        <div>
-                          <p className="font-medium text-slate-900">{product.name}</p>
-                          <p className="text-xs text-slate-600">{product.brands?.name || 'No brand'}</p>
-                        </div>
-                      </div>
-                    </td>
+  <div className="flex items-center gap-3">
+    <img
+      src={getImageUrl(product.image_url, product.name)}
+      onError={(e) => handleImageError(e, product.name)}
+      alt={product.name}
+      className="w-12 h-12 rounded object-cover"
+    />
+    <div>
+      <p 
+        className="font-semibold text-slate-900 mb-1 cursor-pointer hover:text-blue-600 transition" 
+        onClick={() => setViewingProductId(product.id)}
+      >
+        {product.name}
+      </p>
+      <p className="text-xs text-slate-600">{product.brands?.name || 'No brand'}</p>
+    </div>
+  </div>
+</td>
                     <td className="py-4 px-4 text-slate-700">{product.sku}</td>
                     <td className="py-4 px-4 text-slate-700">{product.categories?.name || 'Uncategorized'}</td>
                     <td className="py-4 px-4 font-medium text-slate-900">${product.unit_price}</td>

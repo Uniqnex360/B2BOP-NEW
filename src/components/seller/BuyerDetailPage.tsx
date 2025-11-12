@@ -6,9 +6,11 @@ import { ArrowLeft, Plus, Trash2, Edit2, CreditCard, TrendingUp, Package, Shoppi
 interface BuyerDetailPageProps {
   buyerId: string;
   onBack: () => void;
+    onNavigateToOrder?: (orderId: string) => void;
+
 }
 
-export default function BuyerDetailPage({ buyerId, onBack }: BuyerDetailPageProps) {
+export default function BuyerDetailPage({ buyerId, onBack,onNavigateToOrder }: BuyerDetailPageProps) {
   const { profile } = useAuth();
   const [buyer, setBuyer] = useState<any>(null);
   const [address, setAddress] = useState<any>(null);
@@ -734,7 +736,14 @@ export default function BuyerDetailPage({ buyerId, onBack }: BuyerDetailPageProp
                 <tbody>
                   {orders.map((order) => (
                     <tr key={order.id} className="border-b border-slate-100 hover:bg-slate-50">
-                      <td className="py-4 px-4 font-medium text-blue-600">{order.order_number}</td>
+                      <td className="py-4 px-4">
+                        <button
+                          onClick={() => onNavigateToOrder?.(order.id)}
+                          className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                        >
+                          {order.order_number}
+                        </button>
+                      </td>
                       <td className="py-4 px-4 text-slate-700">
                         {new Date(order.created_at).toLocaleDateString()}
                       </td>

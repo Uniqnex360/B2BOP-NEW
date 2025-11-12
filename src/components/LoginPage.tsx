@@ -50,7 +50,7 @@ export default function LoginPage() {
         <div className="bg-white rounded-2xl shadow-xl p-8 border border-slate-200">
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-blue-600 to-blue-700 rounded-2xl mb-4 shadow-lg">
-              <span className="text-3xl font-bold text-white">B2B</span>
+              <img src='./Favicon image-b2b.png'/>
             </div>
             <h1 className="text-3xl font-bold text-slate-900 mb-2">B2B Platform</h1>
             <p className="text-slate-600">Sign in to your account</p>

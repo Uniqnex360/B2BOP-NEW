@@ -76,7 +76,7 @@ export default function ProductDetailPage({ productId, onBack, onAddToCart }: Pr
       setInWishlist(true);
     }
   };
-  console.log('variants',variants)
+
   const handleAddToCart = () => {
     if (product && onAddToCart) {
       const itemToAdd = selectedVariant ? { ...product, ...selectedVariant, variant_id: selectedVariant.id } : product;
@@ -85,11 +85,19 @@ export default function ProductDetailPage({ productId, onBack, onAddToCart }: Pr
   };
 
   const getCurrentPrice = () => {
-    return selectedVariant ? selectedVariant.unit_price : product.unit_price;
+    return selectedVariant ? selectedVariant.unit_price : product?.unit_price;
   };
 
   const getCurrentStock = () => {
-    return selectedVariant ? selectedVariant.stock_quantity : product.stock_quantity;
+    return selectedVariant ? selectedVariant.stock_quantity : product?.stock_quantity;
+  };
+
+  // Parse features from the string into an array
+  const parseFeatures = () => {
+    if (!product?.features) return [];
+    
+    // Split by \r\n or \n to handle different line endings
+    return product.features.split(/\r\n|\n/).filter((feature: string) => feature.trim() !== '');
   };
 
   if (loading) {
@@ -110,6 +118,8 @@ export default function ProductDetailPage({ productId, onBack, onAddToCart }: Pr
       </div>
     );
   }
+
+  const featuresList = parseFeatures();
 
   return (
     <div className="space-y-6">
@@ -246,6 +256,23 @@ export default function ProductDetailPage({ productId, onBack, onAddToCart }: Pr
               <p className="text-slate-600 leading-relaxed">{product.description}</p>
             </div>
 
+            {/* Features Section */}
+            {featuresList.length > 0 && (
+              <div className="border-t border-slate-200 pt-4">
+                <h3 className="font-semibold text-slate-900 mb-3">Features & Specifications</h3>
+                <div className="space-y-2">
+                  {featuresList.map((feature: string, index: number) => (
+                    <div key={index} className="flex items-start gap-3 py-2">
+                      <div className="flex-shrink-0 w-2 h-2 bg-blue-600 rounded-full mt-2"></div>
+                      <div>
+                        <p className="text-slate-700">{feature}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="border-t border-slate-200 pt-4">
               <h3 className="font-semibold text-slate-900 mb-3">Order Details</h3>
               <div className="grid grid-cols-2 gap-4">
@@ -281,7 +308,7 @@ export default function ProductDetailPage({ productId, onBack, onAddToCart }: Pr
                   </button>
                 </div>
                 <div className="text-sm text-slate-600">
-                  Total: <span className="font-semibold text-slate-900">${(product.unit_price * quantity).toFixed(2)}</span>
+                  Total: <span className="font-semibold text-slate-900">${(getCurrentPrice() * quantity).toFixed(2)}</span>
                 </div>
               </div>
             </div>
@@ -289,10 +316,15 @@ export default function ProductDetailPage({ productId, onBack, onAddToCart }: Pr
             <div className="border-t border-slate-200 pt-4">
               <button
                 onClick={handleAddToCart}
-                className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-lg font-semibold"
+                disabled={getCurrentStock() === 0}
+                className={`w-full flex items-center justify-center gap-3 px-6 py-4 rounded-lg transition text-lg font-semibold ${
+                  getCurrentStock() === 0
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                }`}
               >
                 <ShoppingCart className="w-5 h-5" />
-                Add to Cart
+                {getCurrentStock() === 0 ? 'Out of Stock' : 'Add to Cart'}
               </button>
             </div>
           </div>

@@ -13,6 +13,7 @@ export default function MessagesPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
 
   useEffect(() => {
     loadBuyers();
@@ -21,8 +22,14 @@ export default function MessagesPage() {
   useEffect(() => {
     if (selectedBuyer) {
       loadMessages(selectedBuyer.id);
+      markMessagesAsRead(selectedBuyer.id);
     }
   }, [selectedBuyer]);
+
+  useEffect(() => {
+    // Load unread counts for all buyers
+    loadUnreadCounts();
+  }, [buyers]);
 
   const loadBuyers = async () => {
     if (!profile?.id) return;
@@ -51,6 +58,44 @@ export default function MessagesPage() {
     setMessages(data || []);
   };
 
+  const loadUnreadCounts = async () => {
+    if (!profile?.id || buyers.length === 0) return;
+
+    const buyerIds = buyers.map(buyer => buyer.id);
+    
+    const { data } = await supabase
+      .from('messages')
+      .select('sender_id')
+      .eq('recipient_id', profile.id)
+      .in('sender_id', buyerIds)
+      .eq('is_read', false);
+
+    const counts: Record<string, number> = {};
+    data?.forEach(msg => {
+      counts[msg.sender_id] = (counts[msg.sender_id] || 0) + 1;
+    });
+
+    setUnreadCounts(counts);
+  };
+
+  const markMessagesAsRead = async (buyerId: string) => {
+    if (!profile?.id) return;
+
+    // Mark all messages from this buyer as read
+    await supabase
+      .from('messages')
+      .update({ is_read: true })
+      .eq('sender_id', buyerId)
+      .eq('recipient_id', profile.id)
+      .eq('is_read', false);
+
+    // Update local unread counts
+    setUnreadCounts(prev => ({
+      ...prev,
+      [buyerId]: 0
+    }));
+  };
+
   const handleSendMessage = async () => {
     if (!newMessage.trim()) {
       alert('Please enter a message');
@@ -69,6 +114,7 @@ export default function MessagesPage() {
         recipient_id: selectedBuyer.id,
         subject: subject.trim() || 'Response from Seller',
         message: newMessage.trim(),
+        is_read: false,
       });
 
       if (error) throw error;
@@ -108,6 +154,7 @@ export default function MessagesPage() {
 
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden" style={{ height: '600px' }}>
         <div className="flex h-full">
+          {/* Sidebar with buyers list */}
           <div className="w-80 border-r border-slate-200 flex flex-col">
             <div className="p-4 border-b border-slate-200">
               <div className="relative">
@@ -132,34 +179,58 @@ export default function MessagesPage() {
                 </div>
               ) : (
                 <div className="p-2">
-                  {filteredBuyers.map((buyer) => (
-                    <button
-                      key={buyer.id}
-                      onClick={() => setSelectedBuyer(buyer)}
-                      className={`w-full text-left p-3 rounded-lg mb-2 transition ${
-                        selectedBuyer?.id === buyer.id
-                          ? 'bg-blue-50 border-2 border-blue-500'
-                          : 'hover:bg-slate-50 border-2 border-transparent'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-blue-600 text-white rounded-full flex items-center justify-center font-semibold shrink-0">
-                          {buyer.first_name?.[0]}{buyer.last_name?.[0]}
+                  {filteredBuyers.map((buyer) => {
+                    const unreadCount = unreadCounts[buyer.id] || 0;
+                    const hasUnread = unreadCount > 0;
+                    
+                    return (
+                      <button
+                        key={buyer.id}
+                        onClick={() => setSelectedBuyer(buyer)}
+                        className={`w-full text-left p-3 rounded-lg mb-2 transition relative ${
+                          selectedBuyer?.id === buyer.id
+                            ? 'bg-blue-50 border-2 border-blue-500'
+                            : 'hover:bg-slate-50 border-2 border-transparent'
+                        } ${hasUnread ? 'bg-blue-25' : ''}`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="relative">
+                            <div className="w-10 h-10 bg-blue-600 text-white rounded-full flex items-center justify-center font-semibold shrink-0">
+                              {buyer.first_name?.[0]}{buyer.last_name?.[0]}
+                            </div>
+                            {hasUnread && (
+                              <div className="absolute -top-1 -right-1">
+                                <div className="bg-red-500 text-white text-xs font-bold rounded-full min-w-[18px] h-4 flex items-center justify-center px-1">
+                                  {unreadCount > 99 ? '99+' : unreadCount}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between">
+                              <p className={`font-medium truncate ${
+                                hasUnread ? 'text-blue-900 font-semibold' : 'text-slate-900'
+                              }`}>
+                                {buyer.business_name || `${buyer.first_name} ${buyer.last_name}`}
+                              </p>
+                            </div>
+                            <p className="text-xs text-slate-600 truncate">{buyer.email}</p>
+                            {hasUnread && (
+                              <p className="text-xs text-blue-600 font-medium mt-1">
+                                {unreadCount} unread message{unreadCount !== 1 ? 's' : ''}
+                              </p>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-slate-900 truncate">
-                            {buyer.business_name || `${buyer.first_name} ${buyer.last_name}`}
-                          </p>
-                          <p className="text-xs text-slate-600 truncate">{buyer.email}</p>
-                        </div>
-                      </div>
-                    </button>
-                  ))}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>
           </div>
 
+          {/* Main chat area */}
           <div className="flex-1 flex flex-col">
             {selectedBuyer ? (
               <>
