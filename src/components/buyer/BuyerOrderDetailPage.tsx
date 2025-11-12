@@ -13,6 +13,8 @@ export default function BuyerOrderDetailPage({ orderId, onBack, onNavigate }: Bu
   const { profile } = useAuth();
   const [order, setOrder] = useState<any>(null);
   const [orderItems, setOrderItems] = useState<any[]>([]);
+  const [billingAddress, setBillingAddress] = useState<any>(null);
+  const [shippingAddress, setShippingAddress] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -56,17 +58,46 @@ export default function BuyerOrderDetailPage({ orderId, onBack, onNavigate }: Bu
         .eq('order_id', orderId)
         .order('created_at')
     ]);
+
+    if (!orderRes.data) {
+      setLoading(false);
+      return;
+    }
+
+    const buyerId = orderRes.data.buyer_id;
+
+    // Fetch addresses using the buyerId
+    const [billingAddressRes, shippingAddressRes] = await Promise.all([
+      supabase
+        .from('buyer_addresses')
+        .select('*')
+        .eq('buyer_id', buyerId)
+        .eq('address_type', 'billing')
+        .eq('is_default', true)
+        .maybeSingle(),
+      supabase
+        .from('buyer_addresses')
+        .select('*')
+        .eq('buyer_id', buyerId)
+        .eq('address_type', 'shipping')
+        .eq('is_default', true)
+        .maybeSingle()
+    ]);
+
     setOrder(orderRes.data);
     setOrderItems(itemsRes.data || []);
+    setBillingAddress(billingAddressRes.data);
+    setShippingAddress(shippingAddressRes.data);
     setLoading(false);
   };
-    console.log("ORDER",order)
+
+  console.log("ORDER", order);
+  console.log("Billing Address:", billingAddress);
+  console.log("Shipping Address:", shippingAddress);
 
   const handlePrint = () => {
     window.print();
   };
-  console.log("ORDERRES",order)
-
 
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
@@ -154,11 +185,7 @@ export default function BuyerOrderDetailPage({ orderId, onBack, onNavigate }: Bu
             </div>
           </div>
           <div className="text-right">
-            {/* <div className="w-20 h-20 bg-blue-600 rounded-xl flex items-center justify-center mb-2">
-              <span className="text-2xl font-bold text-white">B2B</span>
-            </div> */}
-            {/* <p className="text-sm font-semibold text-slate-900">{seller?.business_name || seller?.company_name}</p>
-            <p className="text-xs text-slate-600">{seller?.email}</p> */}
+            {/* Optional: Add your company logo or info here */}
           </div>
         </div>
 
@@ -171,17 +198,21 @@ export default function BuyerOrderDetailPage({ orderId, onBack, onNavigate }: Bu
               <h3 className="font-semibold text-slate-900">Bill To:</h3>
             </div>
             <div className="text-sm text-slate-600 space-y-1">
-              <p className="font-medium text-slate-900">
-                {profile?.company_name || profile?.business_name || `${profile?.first_name} ${profile?.last_name}`}
-              </p>
-              <p>{profile?.email}</p>
-              {profile?.phone && <p>{profile.phone}</p>}
-              {profile?.address && (
+              {billingAddress ? (
                 <>
-                  <p>{profile.address}</p>
-                  <p>{profile.city}, {profile.state} {profile.zip_code}</p>
-                  <p>{profile.country || 'USA'}</p>
+                  <p className="font-medium text-slate-900">
+                    {billingAddress.full_name || profile?.company_name || profile?.business_name || `${profile?.first_name} ${profile?.last_name}`}
+                  </p>
+                  <p>{profile?.email}</p>
+                  {/* 
+                  {billingAddress.phone && <p>{billingAddress.phone}</p>}
+                  <p>{billingAddress.street_address || billingAddress.address_line1}</p>
+                  {billingAddress.address_line2 && <p>{billingAddress.address_line2}</p>}
+                  <p>{billingAddress.city}, {billingAddress.state} {billingAddress.postal_code}</p>
+                  <p>{billingAddress.country || 'USA'}</p> */}
                 </>
+              ) : (
+                <p className="text-slate-400">No billing address found</p>
               )}
             </div>
           </div>
@@ -193,15 +224,20 @@ export default function BuyerOrderDetailPage({ orderId, onBack, onNavigate }: Bu
               <h3 className="font-semibold text-slate-900">Ship To:</h3>
             </div>
             <div className="text-sm text-slate-600 space-y-1">
-              <p className="font-medium text-slate-900">
-                {profile?.company_name || profile?.business_name || `${profile?.first_name} ${profile?.last_name}`}
-              </p>
-              {profile?.address && (
+              {billingAddress ? (
                 <>
-                  <p>{profile.address}</p>
-                  <p>{profile.city}, {profile.state} {profile.zip_code}</p>
-                  <p>{profile.country || 'USA'}</p>
+                  <p className="font-medium text-slate-900">
+                    {billingAddress.full_name || profile?.company_name || profile?.business_name || `${profile?.first_name} ${profile?.last_name}`}
+                  </p>
+                  <p>{profile?.email}</p>
+                  {billingAddress.phone && <p>{billingAddress.phone}</p>}
+                  <p>{billingAddress.street_address || billingAddress.address_line1}</p>
+                  {billingAddress.address_line2 && <p>{billingAddress.address_line2}</p>}
+                  <p>{billingAddress.city}, {billingAddress.state} {billingAddress.postal_code}</p>
+                  <p>{billingAddress.country || 'USA'}</p>
                 </>
+              ) : (
+                <p className="text-slate-400">No billing address found</p>
               )}
             </div>
           </div>
