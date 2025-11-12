@@ -3,11 +3,10 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { X } from 'lucide-react';
 
-// Change the interface first
 interface PromotionModalProps {
   promotion?: any;
   onClose: () => void;
-  onSuccess: (createdPromotion?: any) => void; // Update to accept parameter
+  onSuccess: (createdPromotion?: any) => void;
 }
 
 export default function PromotionModal({ promotion, onClose, onSuccess }: PromotionModalProps) {
@@ -29,6 +28,9 @@ export default function PromotionModal({ promotion, onClose, onSuccess }: Promot
     is_active: promotion?.is_active ?? true,
   });
 
+  // Track if this is an edit operation
+  const isEdit = !!promotion;
+
   useEffect(() => {
     loadData();
   }, []);
@@ -45,63 +47,151 @@ export default function PromotionModal({ promotion, onClose, onSuccess }: Promot
     setProducts(prodRes.data || []);
   };
 
- const handleSubmit = async (e: FormEvent) => {
-  e.preventDefault();
-  setLoading(true);
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
 
-  try {
-    const data: any = {
-      seller_id: profile!.id,
-      name: formData.name,
-      description: formData.description || null,
-      applies_to: formData.applies_to,
-      promotion_type: formData.promotion_type,
-      discount_value: parseFloat(formData.discount_value),
-      start_date: new Date(formData.start_date).toISOString(),
-      end_date: new Date(formData.end_date).toISOString(),
-      is_active: formData.is_active,
-      category_id: null,
-      brand_id: null,
-      product_id: null,
-      coupon_code: null,
-    };
+    try {
+      const data: any = {
+        seller_id: profile!.id,
+        name: formData.name,
+        description: formData.description || null,
+        applies_to: formData.applies_to,
+        promotion_type: formData.promotion_type,
+        discount_value: parseFloat(formData.discount_value),
+        start_date: new Date(formData.start_date).toISOString(),
+        end_date: new Date(formData.end_date).toISOString(),
+        is_active: formData.is_active,
+        category_id: null,
+        brand_id: null,
+        product_id: null,
+        coupon_code: null,
+      };
 
-    if (formData.applies_to === 'specific' && formData.target_id) {
-      if (formData.target_type === 'category') {
-        data.category_id = formData.target_id;
-      } else if (formData.target_type === 'brand') {
-        data.brand_id = formData.target_id;
-      } else if (formData.target_type === 'product') {
-        data.product_id = formData.target_id;
+      if (formData.applies_to === 'specific' && formData.target_id) {
+        if (formData.target_type === 'category') {
+          data.category_id = formData.target_id;
+        } else if (formData.target_type === 'brand') {
+          data.brand_id = formData.target_id;
+        } else if (formData.target_type === 'product') {
+          data.product_id = formData.target_id;
+        }
       }
-    }
 
-    let result;
-    if (promotion) {
-      const { data: updateData, error } = await supabase
-        .from('promotions')
-        .update(data)
-        .eq('id', promotion.id)
-        .select(); // Add .select() to get the updated record
-      if (error) throw error;
-      result = updateData?.[0];
-    } else {
-      const { data: insertData, error } = await supabase
-        .from('promotions')
-        .insert(data)
-        .select(); // Add .select() to get the created record
-      if (error) throw error;
-      result = insertData?.[0];
-    }
+      let result;
+      if (promotion) {
+        // For edits, first remove the promotion from existing products
+        await removePromotionFromProducts(promotion.id);
+        
+        const { data: updateData, error } = await supabase
+          .from('promotions')
+          .update(data)
+          .eq('id', promotion.id)
+          .select();
+        if (error) throw error;
+        result = updateData?.[0];
+        
+        // If the promotion is active after edit, apply it to products
+        if (result.is_active) {
+          await applyPromotionToProducts(result);
+        }
+      } else {
+        const { data: insertData, error } = await supabase
+          .from('promotions')
+          .insert(data)
+          .select();
+        if (error) throw error;
+        result = insertData?.[0];
+        
+        // If the promotion is active, apply it to products
+        if (result.is_active) {
+          await applyPromotionToProducts(result);
+        }
+      }
 
-    // Pass the created/updated promotion to onSuccess
-    onSuccess(result);
-  } catch (err: any) {
-    alert(err.message || 'Failed to save promotion');
-  } finally {
-    setLoading(false);
-  }
-};
+      // Pass the created/updated promotion to onSuccess
+      onSuccess(result);
+    } catch (err: any) {
+      alert(err.message || 'Failed to save promotion');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Function to apply promotion to products
+  const applyPromotionToProducts = async (promotionData: any) => {
+    try {
+      // First, get all applicable products
+      let query = supabase
+        .from('products')
+        .select('*')
+        .eq('seller_id', profile!.id);
+
+      // Apply filters based on promotion type
+      if (promotionData.applies_to === 'specific') {
+        if (promotionData.category_id) {
+          query = query.eq('category_id', promotionData.category_id);
+        } else if (promotionData.brand_id) {
+          query = query.eq('brand_id', promotionData.brand_id);
+        } else if (promotionData.product_id) {
+          query = query.eq('id', promotionData.product_id);
+        }
+      }
+
+      const { data: applicableProducts, error: fetchError } = await query;
+      if (fetchError) throw fetchError;
+
+      if (!applicableProducts || applicableProducts.length === 0) {
+        console.log('No products found to apply promotion to');
+        return;
+      }
+
+      // Update each product with the calculated discount
+      for (const product of applicableProducts) {
+        const updateData: any = {
+          promotion_id: promotionData.id,
+          original_price: product.original_price || product.unit_price
+        };
+
+        // Calculate discount price
+        if (promotionData.promotion_type === 'percentage') {
+          updateData.discount_price = Number((product.unit_price * (1 - promotionData.discount_value / 100)).toFixed(2));
+        } else {
+          updateData.discount_price = Number(Math.max(0, product.unit_price - promotionData.discount_value).toFixed(2));
+        }
+
+        await supabase
+          .from('products')
+          .update(updateData)
+          .eq('id', product.id);
+      }
+
+      console.log(`Promotion applied to ${applicableProducts.length} products successfully`);
+    } catch (error) {
+      console.error('Error applying promotion to products:', error);
+      throw error;
+    }
+  };
+
+  // Function to remove promotion from products
+  const removePromotionFromProducts = async (promotionId: string) => {
+    try {
+      const { error } = await supabase
+        .from('products')
+        .update({
+          promotion_id: null,
+          discount_price: null
+        })
+        .eq('promotion_id', promotionId);
+
+      if (error) throw error;
+      
+      console.log('Promotion removed from products');
+    } catch (error) {
+      console.error('Error removing promotion from products:', error);
+      throw error;
+    }
+  };
 
   return (
     <div className="fixed inset-0 bg-blue-600/50 z-50 flex items-center justify-center p-4">
@@ -272,6 +362,7 @@ export default function PromotionModal({ promotion, onClose, onSuccess }: Promot
               Active (buyers will see this promotion)
             </label>
           </div>
+
 
           <div className="flex gap-3 pt-4 border-t border-slate-200">
             <button

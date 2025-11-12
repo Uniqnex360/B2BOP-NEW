@@ -95,7 +95,7 @@ export default function PromotionDetailPage({ promotionId, onBack }: PromotionDe
             <Edit2 className="w-4 h-4" />
             Edit
           </button>
-          {promotion.is_active && (
+          {/* {promotion.is_active && (
             <button
               onClick={handleCloseOffer}
               className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
@@ -103,7 +103,7 @@ export default function PromotionDetailPage({ promotionId, onBack }: PromotionDe
               <XCircle className="w-4 h-4" />
               Close Offer
             </button>
-          )}
+          )} */}
         </div>
       </div>
 
