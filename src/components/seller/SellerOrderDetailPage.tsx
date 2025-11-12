@@ -115,6 +115,7 @@ export default function SellerOrderDetailPage({ orderId, onBack }: SellerOrderDe
   const [selectedOrderItem, setSelectedOrderItem] = useState<any>(null);
   const [billingAddress, setBillingAddress] = useState<any>(null);
   const [shippingAddress, setShippingAddress] = useState<any>(null);
+  const [paymentMethod, setPaymentMethod] = useState<any>(null);
 
   useEffect(() => {
     loadOrderDetails();
@@ -135,90 +136,98 @@ export default function SellerOrderDetailPage({ orderId, onBack }: SellerOrderDe
   };
 
   const loadOrderDetails = async () => {
-  if (!profile?.id) return;
+    if (!profile?.id) return;
 
-  setLoading(true);
+    setLoading(true);
 
-  // First, get the order to get the buyer_id
-  const orderRes = await supabase
-    .from('orders')
-    .select(`
-      *,
-      user_profiles!orders_buyer_id_fkey(
-        id,
-        first_name,
-        last_name,
-        email,
-        company_name,
-        business_name,
-        phone
-      )
-    `)
-    .eq('id', orderId)
-    .eq('seller_id', profile.id)
-    .maybeSingle();
-
-  if (!orderRes.data) {
-    setLoading(false);
-    return;
-  }
-
-  const buyerId = orderRes.data.buyer_id;
-
-  // Then get all other data in parallel
-  const [itemsRes, shipmentsRes, billingAddressRes, shippingAddressRes] = await Promise.all([
-    supabase
-      .from('order_items')
+    // First, get the order to get the buyer_id
+    const orderRes = await supabase
+      .from('orders')
       .select(`
         *,
-        products(id, name, sku, image_url)
+        user_profiles!orders_buyer_id_fkey(
+          id,
+          first_name,
+          last_name,
+          email,
+          company_name,
+          business_name,
+          phone
+        )
       `)
-      .eq('order_id', orderId)
-      .order('created_at'),
-    supabase
-      .from('shipment_items')
-      .select(`
-        quantity,
-        order_item_id,
-        shipments!inner(order_id, status)
-      `)
-      .eq('shipments.order_id', orderId),
-    // Fetch billing address
-    supabase
-      .from('buyer_addresses')
-      .select('*')
-      .eq('buyer_id', buyerId)
-      .eq('address_type', 'billing')
-      .eq('is_default', true)
-      .maybeSingle(),
-    // Fetch shipping address
-    supabase
-      .from('buyer_addresses')
-      .select('*')
-      .eq('buyer_id', buyerId)
-      .eq('address_type', 'shipping')
-      .eq('is_default', true)
-      .maybeSingle()
-  ]);
+      .eq('id', orderId)
+      .eq('seller_id', profile.id)
+      .maybeSingle();
 
-  setOrder(orderRes.data);
-  setOrderItems(itemsRes.data || []);
-  setBillingAddress(billingAddressRes.data);
-  setShippingAddress(shippingAddressRes.data);
+    if (!orderRes.data) {
+      setLoading(false);
+      return;
+    }
 
-  // Calculate fulfilled quantities per order item
-  const fulfilled: Record<string, number> = {};
-  if (shipmentsRes.data) {
-    shipmentsRes.data.forEach((si: any) => {
-      const itemId = si.order_item_id;
-      fulfilled[itemId] = (fulfilled[itemId] || 0) + si.quantity;
-    });
-  }
-  setFulfilledQuantities(fulfilled);
+    const buyerId = orderRes.data.buyer_id;
 
-  setLoading(false);
-};
-    console.log("ORDER",order)
+    // Then get all other data in parallel
+    const [itemsRes, shipmentsRes, billingAddressRes, shippingAddressRes, paymentRes] = await Promise.all([
+      supabase
+        .from('order_items')
+        .select(`
+          *,
+          products(id, name, sku, image_url)
+        `)
+        .eq('order_id', orderId)
+        .order('created_at'),
+      supabase
+        .from('shipment_items')
+        .select(`
+          quantity,
+          order_item_id,
+          shipments!inner(order_id, status)
+        `)
+        .eq('shipments.order_id', orderId),
+      // Fetch billing address
+      supabase
+        .from('buyer_addresses')
+        .select('*')
+        .eq('buyer_id', buyerId)
+        .eq('address_type', 'billing')
+        .eq('is_default', true)
+        .maybeSingle(),
+      // Fetch shipping address
+      supabase
+        .from('buyer_addresses')
+        .select('*')
+        .eq('buyer_id', buyerId)
+        .eq('address_type', 'shipping')
+        .eq('is_default', true)
+        .maybeSingle(),
+      // Fetch payment method
+      supabase
+        .from('payments')
+        .select('*')
+        .eq('order_id', orderId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+    ]);
+
+    setOrder(orderRes.data);
+    setOrderItems(itemsRes.data || []);
+    setBillingAddress(billingAddressRes.data);
+    setShippingAddress(shippingAddressRes.data);
+    setPaymentMethod(paymentRes.data);
+
+    // Calculate fulfilled quantities per order item
+    const fulfilled: Record<string, number> = {};
+    if (shipmentsRes.data) {
+      shipmentsRes.data.forEach((si: any) => {
+        const itemId = si.order_item_id;
+        fulfilled[itemId] = (fulfilled[itemId] || 0) + si.quantity;
+      });
+    }
+    setFulfilledQuantities(fulfilled);
+
+    setLoading(false);
+  };
 
   const getRemainingQuantity = (orderItemId: string, orderedQuantity: number) => {
     const fulfilled = fulfilledQuantities[orderItemId] || 0;
@@ -281,6 +290,30 @@ export default function SellerOrderDetailPage({ orderId, onBack }: SellerOrderDe
     window.print();
   };
 
+  // Helper function to format payment method
+  const getPaymentMethodDisplay = () => {
+    if (!paymentMethod) return 'Not specified';
+    
+    switch (paymentMethod.payment_method) {
+      case 'credit_card':
+        return `Credit Card •••• ${paymentMethod.last_four || '****'}`;
+      case 'debit_card':
+        return `Debit Card •••• ${paymentMethod.last_four || '****'}`;
+      case 'bank_transfer':
+        return 'Bank Transfer';
+      case 'paypal':
+        return 'PayPal';
+      case 'stripe':
+        return 'Stripe';
+      case 'check':
+        return 'Check';
+      case 'cash':
+        return 'Cash';
+      default:
+        return paymentMethod.payment_method || 'Not specified';
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -336,6 +369,9 @@ export default function SellerOrderDetailPage({ orderId, onBack }: SellerOrderDe
               <p>Invoice #: {order.order_number}</p>
               <p>Date: {new Date(order.created_at).toLocaleDateString()}</p>
               <p>Status: <span className="font-medium text-slate-900 capitalize">{order.status}</span></p>
+              {paymentMethod?.transaction_id && (
+                <p>Transaction ID: <span className="font-medium text-slate-900">{paymentMethod.transaction_id}</span></p>
+              )}
             </div>
           </div>
           <div className="text-right">
@@ -347,8 +383,8 @@ export default function SellerOrderDetailPage({ orderId, onBack }: SellerOrderDe
           </div>
         </div>
 
-        {/* Addresses */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        {/* Addresses & Payment Info */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           {/* Bill To */}
           <div>
             <div className="flex items-center gap-2 mb-3">
@@ -360,17 +396,6 @@ export default function SellerOrderDetailPage({ orderId, onBack }: SellerOrderDe
                 {billingAddress?.full_name || buyer?.company_name || buyer?.business_name || `${buyer?.first_name} ${buyer?.last_name}`}
               </p>
               <p>{buyer?.email}</p>
-            </div>
-          </div>
-
-          {/* Ship To */}
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <MapPin className="w-5 h-5 text-blue-600" />
-              <h3 className="font-semibold text-slate-900">Ship To:</h3>
-            </div>
-            <div className="text-sm text-slate-600 space-y-1">
-             
               {billingAddress?.phone && <p>{billingAddress.phone}</p>}
               {billingAddress ? (
                 <>
@@ -381,6 +406,60 @@ export default function SellerOrderDetailPage({ orderId, onBack }: SellerOrderDe
                 </>
               ) : (
                 <p className="text-slate-400">No billing address found</p>
+              )}
+            </div>
+          </div>
+
+          {/* Ship To */}
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <MapPin className="w-5 h-5 text-blue-600" />
+              <h3 className="font-semibold text-slate-900">Ship To:</h3>
+            </div>
+            <div className="text-sm text-slate-600 space-y-1">
+              {shippingAddress ? (
+                <>
+                  <p className="font-medium text-slate-900">
+                    {shippingAddress.full_name || buyer?.company_name || buyer?.business_name || `${buyer?.first_name} ${buyer?.last_name}`}
+                  </p>
+                  <p>{shippingAddress.address_line1}</p>
+                  {shippingAddress.address_line2 && <p>{shippingAddress.address_line2}</p>}
+                  <p>{shippingAddress.city}, {shippingAddress.state} {shippingAddress.postal_code}</p>
+                  <p>{shippingAddress.country || 'USA'}</p>
+                  {shippingAddress.phone && <p>{shippingAddress.phone}</p>}
+                </>
+              ) : (
+                <p className="text-slate-400">No shipping address found</p>
+              )}
+            </div>
+          </div>
+
+          {/* Payment Method */}
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <CreditCard className="w-5 h-5 text-blue-600" />
+              <h3 className="font-semibold text-slate-900">Payment Info:</h3>
+            </div>
+            <div className="text-sm text-slate-600 space-y-1">
+              <p className="font-medium text-slate-900">
+                {/* {getPaymentMethodDisplay()} */}
+                {order.notes}
+              </p>
+              <p>Status: <span className={`font-medium ${
+                order.payment_status === 'paid' ? 'text-green-600' :
+                order.payment_status === 'partial' ? 'text-yellow-600' :
+                'text-red-600'
+              }`}>
+                {order.payment_status}
+              </span></p>
+              {paymentMethod?.transaction_id && (
+                <p>Transaction ID: <span className="font-medium text-slate-900">{paymentMethod.transaction_id}</span></p>
+              )}
+              {paymentMethod?.payment_date && (
+                <p>Paid: {new Date(paymentMethod.payment_date).toLocaleDateString()}</p>
+              )}
+              {paymentMethod?.amount && (
+                <p>Amount: <span className="font-medium text-slate-900">${parseFloat(paymentMethod.amount).toFixed(2)}</span></p>
               )}
             </div>
           </div>
@@ -555,12 +634,12 @@ export default function SellerOrderDetailPage({ orderId, onBack }: SellerOrderDe
         </div>
 
         {/* Notes */}
-        {order.notes && (
+        {/* {order.notes && (
           <div className="mt-6 p-4 bg-slate-50 rounded-lg">
             <h4 className="text-sm font-semibold text-slate-900 mb-2">Notes:</h4>
             <p className="text-sm text-slate-600">{order.notes}</p>
           </div>
-        )}
+        )} */}
       </div>
 
       {/* Fulfillment Modal */}
