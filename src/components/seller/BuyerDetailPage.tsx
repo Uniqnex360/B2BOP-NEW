@@ -36,7 +36,7 @@ export default function BuyerDetailPage({ buyerId, onBack }: BuyerDetailPageProp
     phone: '',
     creditDays: '30',
     creditLimit: '',
-    // Address fields
+    
     addressLine1: '',
     addressLine2: '',
     city: '',
@@ -84,7 +84,7 @@ export default function BuyerDetailPage({ buyerId, onBack }: BuyerDetailPageProp
       phone: buyer.phone || '',
       creditDays: creditTerms?.credit_days?.toString() || '30',
       creditLimit: creditTerms?.credit_limit?.toString() || '',
-      // Address fields
+      
       addressLine1: address?.address_line1 || '',
       addressLine2: address?.address_line2 || '',
       city: address?.city || '',
@@ -97,7 +97,7 @@ export default function BuyerDetailPage({ buyerId, onBack }: BuyerDetailPageProp
 
   const handleUpdateBuyer = async () => {
     try {
-      // Update user profile
+      
       const { error: profileError } = await supabase
         .from('user_profiles')
         .update({
@@ -112,7 +112,7 @@ export default function BuyerDetailPage({ buyerId, onBack }: BuyerDetailPageProp
 
       if (profileError) throw profileError;
 
-      // Update credit terms
+      
       const { error: creditError } = await supabase
         .from('buyer_credit_terms')
         .upsert({
@@ -128,9 +128,9 @@ export default function BuyerDetailPage({ buyerId, onBack }: BuyerDetailPageProp
 
       if (creditError) throw creditError;
 
-      // Update address
+      
       if (address) {
-        // Update existing address
+        
         const { error: addressError } = await supabase
           .from('buyer_addresses')
           .update({
@@ -148,7 +148,7 @@ export default function BuyerDetailPage({ buyerId, onBack }: BuyerDetailPageProp
 
         if (addressError) throw addressError;
       } else {
-        // Create new address if doesn't exist
+        
         const { error: addressError } = await supabase
           .from('buyer_addresses')
           .insert({
@@ -169,7 +169,7 @@ export default function BuyerDetailPage({ buyerId, onBack }: BuyerDetailPageProp
       }
 
       setShowEditModal(false);
-      loadData(); // Reload data to reflect changes
+      loadData(); 
     } catch (err: any) {
       alert(err.message || 'Failed to update buyer');
     }

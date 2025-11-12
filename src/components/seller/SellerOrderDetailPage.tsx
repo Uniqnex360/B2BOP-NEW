@@ -113,6 +113,8 @@ export default function SellerOrderDetailPage({ orderId, onBack }: SellerOrderDe
   const [loading, setLoading] = useState(true);
   const [showFulfillmentModal, setShowFulfillmentModal] = useState(false);
   const [selectedOrderItem, setSelectedOrderItem] = useState<any>(null);
+  const [billingAddress, setBillingAddress] = useState<any>(null);
+  const [shippingAddress, setShippingAddress] = useState<any>(null);
 
   useEffect(() => {
     loadOrderDetails();
@@ -133,66 +135,89 @@ export default function SellerOrderDetailPage({ orderId, onBack }: SellerOrderDe
   };
 
   const loadOrderDetails = async () => {
-    if (!profile?.id) return;
+  if (!profile?.id) return;
 
-    setLoading(true);
+  setLoading(true);
 
-    const [orderRes, itemsRes, shipmentsRes] = await Promise.all([
-      supabase
-        .from('orders')
-        .select(`
-          *,
-          user_profiles!orders_buyer_id_fkey(
-            id,
-            first_name,
-            last_name,
-            email,
-            company_name,
-            business_name,
-            phone,
-            address,
-            city,
-            state,
-            zip_code,
-            country
-          )
-        `)
-        .eq('id', orderId)
-        .eq('seller_id', profile.id)
-        .maybeSingle(),
-      supabase
-        .from('order_items')
-        .select(`
-          *,
-          products(id, name, sku, image_url)
-        `)
-        .eq('order_id', orderId)
-        .order('created_at'),
-      supabase
-        .from('shipment_items')
-        .select(`
-          quantity,
-          order_item_id,
-          shipments!inner(order_id, status)
-        `)
-        .eq('shipments.order_id', orderId)
-    ]);
+  // First, get the order to get the buyer_id
+  const orderRes = await supabase
+    .from('orders')
+    .select(`
+      *,
+      user_profiles!orders_buyer_id_fkey(
+        id,
+        first_name,
+        last_name,
+        email,
+        company_name,
+        business_name,
+        phone
+      )
+    `)
+    .eq('id', orderId)
+    .eq('seller_id', profile.id)
+    .maybeSingle();
 
-    setOrder(orderRes.data);
-    setOrderItems(itemsRes.data || []);
-
-    // Calculate fulfilled quantities per order item
-    const fulfilled: Record<string, number> = {};
-    if (shipmentsRes.data) {
-      shipmentsRes.data.forEach((si: any) => {
-        const itemId = si.order_item_id;
-        fulfilled[itemId] = (fulfilled[itemId] || 0) + si.quantity;
-      });
-    }
-    setFulfilledQuantities(fulfilled);
-
+  if (!orderRes.data) {
     setLoading(false);
-  };
+    return;
+  }
+
+  const buyerId = orderRes.data.buyer_id;
+
+  // Then get all other data in parallel
+  const [itemsRes, shipmentsRes, billingAddressRes, shippingAddressRes] = await Promise.all([
+    supabase
+      .from('order_items')
+      .select(`
+        *,
+        products(id, name, sku, image_url)
+      `)
+      .eq('order_id', orderId)
+      .order('created_at'),
+    supabase
+      .from('shipment_items')
+      .select(`
+        quantity,
+        order_item_id,
+        shipments!inner(order_id, status)
+      `)
+      .eq('shipments.order_id', orderId),
+    // Fetch billing address
+    supabase
+      .from('buyer_addresses')
+      .select('*')
+      .eq('buyer_id', buyerId)
+      .eq('address_type', 'billing')
+      .eq('is_default', true)
+      .maybeSingle(),
+    // Fetch shipping address
+    supabase
+      .from('buyer_addresses')
+      .select('*')
+      .eq('buyer_id', buyerId)
+      .eq('address_type', 'shipping')
+      .eq('is_default', true)
+      .maybeSingle()
+  ]);
+
+  setOrder(orderRes.data);
+  setOrderItems(itemsRes.data || []);
+  setBillingAddress(billingAddressRes.data);
+  setShippingAddress(shippingAddressRes.data);
+
+  // Calculate fulfilled quantities per order item
+  const fulfilled: Record<string, number> = {};
+  if (shipmentsRes.data) {
+    shipmentsRes.data.forEach((si: any) => {
+      const itemId = si.order_item_id;
+      fulfilled[itemId] = (fulfilled[itemId] || 0) + si.quantity;
+    });
+  }
+  setFulfilledQuantities(fulfilled);
+
+  setLoading(false);
+};
 
   const getRemainingQuantity = (orderItemId: string, orderedQuantity: number) => {
     const fulfilled = fulfilledQuantities[orderItemId] || 0;
@@ -331,17 +356,9 @@ export default function SellerOrderDetailPage({ orderId, onBack }: SellerOrderDe
             </div>
             <div className="text-sm text-slate-600 space-y-1">
               <p className="font-medium text-slate-900">
-                {buyer?.company_name || buyer?.business_name || `${buyer?.first_name} ${buyer?.last_name}`}
+                {billingAddress?.full_name || buyer?.company_name || buyer?.business_name || `${buyer?.first_name} ${buyer?.last_name}`}
               </p>
               <p>{buyer?.email}</p>
-              {buyer?.phone && <p>{buyer?.phone}</p>}
-              {buyer?.address && (
-                <>
-                  <p>{buyer.address}</p>
-                  <p>{buyer.city}, {buyer.state} {buyer.zip_code}</p>
-                  <p>{buyer.country || 'USA'}</p>
-                </>
-              )}
             </div>
           </div>
 
@@ -352,15 +369,17 @@ export default function SellerOrderDetailPage({ orderId, onBack }: SellerOrderDe
               <h3 className="font-semibold text-slate-900">Ship To:</h3>
             </div>
             <div className="text-sm text-slate-600 space-y-1">
-              <p className="font-medium text-slate-900">
-                {buyer?.company_name || buyer?.business_name || `${buyer?.first_name} ${buyer?.last_name}`}
-              </p>
-              {buyer?.address && (
+             
+              {billingAddress?.phone && <p>{billingAddress.phone}</p>}
+              {billingAddress ? (
                 <>
-                  <p>{buyer.address}</p>
-                  <p>{buyer.city}, {buyer.state} {buyer.zip_code}</p>
-                  <p>{buyer.country || 'USA'}</p>
+                  <p>{billingAddress.address_line1}</p>
+                  {billingAddress.address_line2 && <p>{billingAddress.address_line2}</p>}
+                  <p>{billingAddress.city}, {billingAddress.state} {billingAddress.postal_code}</p>
+                  <p>{billingAddress.country || 'USA'}</p>
                 </>
+              ) : (
+                <p className="text-slate-400">No billing address found</p>
               )}
             </div>
           </div>
