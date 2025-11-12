@@ -59,7 +59,6 @@ export default function SellerDashboard() {
 
       let totalRevenue = 0;
       let totalCost = 0;
-      console.log("ORDERS",orders)
       orders?.forEach((order) => {
         totalRevenue += parseFloat(order.total_amount || 0);
 
