@@ -56,7 +56,7 @@ export default function PaymentsPage() {
         .from('orders')
         .select(`
           *,
-          buyer:buyer_id(first_name, last_name, business_name, email, phone, address)
+          buyer:buyer_id(id, first_name, last_name, business_name, email, phone)
         `)
         .eq('seller_id', profile.id)
         .order('created_at', { ascending: false });
@@ -73,27 +73,54 @@ export default function PaymentsPage() {
         return;
       }
 
-      // Then, get order items for each order - simplified query without variant
-      const ordersWithItems = await Promise.all(
+      // Then, get order items for each order and buyer addresses
+      const ordersWithDetails = await Promise.all(
         ordersData.map(async (order) => {
-          const { data: itemsData, error: itemsError } = await supabase
-            .from('order_items')
-            .select(`
-              *,
-              product:product_id(name, sku, unit_price)
-            `)
-            .eq('order_id', order.id);
+          const [itemsData, billingAddressRes] = await Promise.all([
+            // Get order items
+            supabase
+              .from('order_items')
+              .select(`
+                *,
+                product:product_id(name, sku, unit_price)
+              `)
+              .eq('order_id', order.id),
+            // Get billing address for this buyer - try multiple approaches
+            supabase
+              .from('buyer_addresses')
+              .select('*')
+              .eq('buyer_id', order.buyer_id)
+              .eq('address_type', 'billing')
+              .eq('is_default', true)
+              .maybeSingle()
+              .then(res => {
+                if (res.data) return res;
+                // Fall back to any billing address
+                return supabase
+                  .from('buyer_addresses')
+                  .select('*')
+                  .eq('buyer_id', order.buyer_id)
+                  .eq('address_type', 'billing')
+                  .limit(1)
+                  .maybeSingle();
+              })
+          ]);
 
-          if (itemsError) {
-            console.error('Error loading order items:', itemsError);
-            return { ...order, order_items: [] };
-          }
-
-          return { ...order, order_items: itemsData || [] };
+          return { 
+            ...order, 
+            order_items: itemsData.data || [],
+            billing_address: billingAddressRes.data 
+          };
         })
       );
 
-      setPayments(ordersWithItems);
+      // Debug logging
+      console.log('Payments with addresses:', ordersWithDetails);
+      ordersWithDetails.forEach((order, index) => {
+        console.log(`Order ${index} billing address:`, order.billing_address);
+      });
+
+      setPayments(ordersWithDetails);
     } catch (error) {
       console.error('Error in loadPayments:', error);
       setPayments([]);
@@ -172,6 +199,9 @@ export default function PaymentsPage() {
     const companyEmail = sellerProfile?.email || 'contact@yourcompany.com';
     const companyPhone = sellerProfile?.phone || 'N/A';
 
+    // Use billing address from buyer_addresses table
+    const billingAddress = order.billing_address;
+    
     const invoiceHTML = `
       <!DOCTYPE html>
       <html>
@@ -267,10 +297,6 @@ export default function PaymentsPage() {
             border-top: 1px solid #ddd;
             padding-top: 20px;
           }
-          .logo { 
-            max-width: 150px; 
-            margin-bottom: 10px;
-          }
         </style>
       </head>
       <body>
@@ -279,8 +305,6 @@ export default function PaymentsPage() {
             <div class="company-info">
               <h1>INVOICE</h1>
               <p><strong>${companyName}</strong></p>
-              <p>${companyAddress}</p>
-              <p>${companyCityState}</p>
               <p>${companyEmail}</p>
               ${companyPhone !== 'N/A' ? `<p>${companyPhone}</p>` : ''}
             </div>
@@ -302,17 +326,25 @@ export default function PaymentsPage() {
             <div class="section">
               <h3>Bill From</h3>
               <p><strong>${companyName}</strong></p>
-              <p>${companyAddress}</p>
-              <p>${companyCityState}</p>
               <p>${companyEmail}</p>
               ${companyPhone !== 'N/A' ? `<p>${companyPhone}</p>` : ''}
             </div>
             <div class="section">
               <h3>Bill To</h3>
-              <p><strong>${order.buyer?.business_name || `${order.buyer?.first_name || ''} ${order.buyer?.last_name || ''}`.trim() || 'Customer'}</strong></p>
-              <p>${order.buyer?.email || 'N/A'}</p>
-              <p>${order.buyer?.phone || 'N/A'}</p>
-              <p>${order.buyer?.address || 'N/A'}</p>
+              ${billingAddress ? `
+                <p><strong>${billingAddress.full_name || order.buyer?.business_name || `${order.buyer?.first_name || ''} ${order.buyer?.last_name || ''}`.trim() || 'Customer'}</strong></p>
+                <p>${order.buyer?.email || 'N/A'}</p>
+                ${billingAddress.phone ? `<p>${billingAddress.phone}</p>` : ''}
+                <p>${billingAddress.street_address || billingAddress.address_line1 || 'N/A'}</p>
+                ${billingAddress.address_line2 ? `<p>${billingAddress.address_line2}</p>` : ''}
+                <p>${billingAddress.city || ''}, ${billingAddress.state || ''} ${billingAddress.postal_code || ''}</p>
+                <p>${billingAddress.country || 'USA'}</p>
+              ` : `
+                <p><strong>${order.buyer?.business_name || `${order.buyer?.first_name || ''} ${order.buyer?.last_name || ''}`.trim() || 'Customer'}</strong></p>
+                <p>${order.buyer?.email || 'N/A'}</p>
+                ${order.buyer?.phone ? `<p>${order.buyer.phone}</p>` : ''}
+                <p class="text-slate-400">No billing address on file</p>
+              `}
             </div>
           </div>
 

@@ -341,7 +341,7 @@ export default function BuyerCatalogPage() {
           for (let i = 1; i < quantity; i++) {
             updateQuantity(product.id, 1);
           }
-          setSelectedProductId(null);
+          // setSelectedProductId(null);
         }}
       />
     );

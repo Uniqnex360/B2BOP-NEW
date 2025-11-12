@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { ArrowLeft, ShoppingCart, Heart, Package, Plus, Minus } from 'lucide-react';
+import { ArrowLeft, ShoppingCart, Heart, Package, Plus, Minus,CheckCircle } from 'lucide-react';
 import { getImageUrl, handleImageError } from '../../utils/imageHelper';
 
 interface ProductDetailPageProps {
@@ -14,6 +14,7 @@ export default function ProductDetailPage({ productId, onBack, onAddToCart }: Pr
   const { profile } = useAuth();
   const [product, setProduct] = useState<any>(null);
   const [variants, setVariants] = useState<any[]>([]);
+  const [showSuccess, setShowSuccess] = useState(false); 
   const [selectedVariant, setSelectedVariant] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
@@ -22,7 +23,14 @@ export default function ProductDetailPage({ productId, onBack, onAddToCart }: Pr
   useEffect(() => {
     loadProduct();
   }, [productId]);
-
+  useEffect(() => {
+  if (showSuccess) {
+    const timer = setTimeout(() => {
+      setShowSuccess(false);
+    }, 5000); // Hide after 5 seconds instead of 3
+    return () => clearTimeout(timer);
+  }
+}, [showSuccess]);
   const loadProduct = async () => {
     if (!profile?.id) return;
 
@@ -55,7 +63,7 @@ export default function ProductDetailPage({ productId, onBack, onAddToCart }: Pr
     setInWishlist(!!wishlistRes.data);
     setLoading(false);
   };
-
+  
   const toggleWishlist = async () => {
     if (!profile?.id || !product) return;
 
@@ -81,6 +89,8 @@ export default function ProductDetailPage({ productId, onBack, onAddToCart }: Pr
     if (product && onAddToCart) {
       const itemToAdd = selectedVariant ? { ...product, ...selectedVariant, variant_id: selectedVariant.id } : product;
       onAddToCart(itemToAdd, quantity);
+      setShowSuccess(true);
+      setTimeout(() => setShowSuccess(false), 3000)
     }
   };
 
@@ -132,7 +142,12 @@ export default function ProductDetailPage({ productId, onBack, onAddToCart }: Pr
         </button>
         <h1 className="text-3xl font-bold text-slate-900">Product Details</h1>
       </div>
-
+    {showSuccess && (
+  <div className="fixed top-4 right-4 z-50 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-2 animate-bounce">
+    <CheckCircle className="w-5 h-5" />
+    <span>Added to cart! ({quantity} item{quantity > 1 ? 's' : ''})</span>
+  </div>
+)}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="bg-white rounded-xl border border-slate-200 p-6">
           <div className="aspect-square bg-slate-100 rounded-lg overflow-hidden mb-4 relative">
@@ -291,7 +306,29 @@ export default function ProductDetailPage({ productId, onBack, onAddToCart }: Pr
                 </div>
               </div>
             )}
-
+             <div className="border-t border-slate-200 pt-4">
+              <button
+                onClick={handleAddToCart}
+                disabled={getCurrentStock() === 0}
+                className={`w-full flex items-center justify-center gap-3 px-6 py-4 rounded-lg transition text-lg font-semibold ${
+                  getCurrentStock() === 0
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                }`}
+              >
+                <ShoppingCart className="w-5 h-5" />
+                {getCurrentStock() === 0 ? 'Out of Stock' : 'Add to Cart'}
+              </button>
+              {showSuccess && (
+                <button
+                  onClick={onBack}
+                  className="w-full mt-3 px-6 py-3 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition font-medium"
+                >
+                  Continue Shopping
+                </button>
+              )}
+            </div>
+            </div>
             <div className="border-t border-slate-200 pt-4">
               <h3 className="font-semibold text-slate-900 mb-2">Description</h3>
               <p className="text-slate-600 leading-relaxed">{product.description}</p>
@@ -354,23 +391,9 @@ export default function ProductDetailPage({ productId, onBack, onAddToCart }: Pr
               </div>
             </div>
 
-            <div className="border-t border-slate-200 pt-4">
-              <button
-                onClick={handleAddToCart}
-                disabled={getCurrentStock() === 0}
-                className={`w-full flex items-center justify-center gap-3 px-6 py-4 rounded-lg transition text-lg font-semibold ${
-                  getCurrentStock() === 0
-                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                    : 'bg-blue-600 text-white hover:bg-blue-700'
-                }`}
-              >
-                <ShoppingCart className="w-5 h-5" />
-                {getCurrentStock() === 0 ? 'Out of Stock' : 'Add to Cart'}
-              </button>
-            </div>
+           
           </div>
         </div>
       </div>
-    </div>
   );
 }
