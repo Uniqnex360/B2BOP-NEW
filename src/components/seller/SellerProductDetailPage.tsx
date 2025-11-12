@@ -266,7 +266,7 @@ export default function SellerProductDetailPage({ productId, onBack, onEdit }: S
             {variants.map((variant) => {
               const isAvailable = variant.stock_quantity > 0;
               const margin = variant.cost_price && variant.unit_price
-                ? (((variant.unit_price - variant.cost_price) / variant.cost_price) * 100).toFixed(1)
+                ? (((variant.unit_price - variant.cost_price) / variant.unit_price) * 100).toFixed(1)
                 : '0';
 
               return (
