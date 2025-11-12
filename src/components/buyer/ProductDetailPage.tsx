@@ -85,7 +85,10 @@ export default function ProductDetailPage({ productId, onBack, onAddToCart }: Pr
   };
 
   const getCurrentPrice = () => {
-    return selectedVariant ? selectedVariant.unit_price : product?.unit_price;
+    const basePrice = selectedVariant ? selectedVariant.unit_price : product?.unit_price;
+    const discountPrice = selectedVariant ? selectedVariant.discount_price : product?.discount_price;
+    
+    return discountPrice || basePrice;
   };
 
   const getCurrentStock = () => {
@@ -167,10 +170,27 @@ export default function ProductDetailPage({ productId, onBack, onAddToCart }: Pr
 
             <div className="border-t border-slate-200 pt-4">
               <div className="flex items-baseline gap-3">
-                <span className="text-4xl font-bold text-blue-600">
-                  ${getCurrentPrice()?.toFixed(2)}
-                </span>
-                <span className="text-lg text-slate-500">per unit</span>
+                {(product.discount_price || (selectedVariant && selectedVariant.discount_price)) ? (
+                  <div className="flex items-baseline gap-3">
+                    <span className="text-4xl font-bold text-red-600">
+                      ${(selectedVariant?.discount_price || product.discount_price)?.toFixed(2)}
+                    </span>
+                    <span className="text-2xl text-slate-500 line-through">
+                      ${(selectedVariant?.original_price || product.original_price || getCurrentPrice())?.toFixed(2)}
+                    </span>
+                    <span className="text-lg text-slate-500">per unit</span>
+                    {/* <span className="bg-red-100 text-red-800 text-sm px-2 py-1 rounded">
+                      SALE
+                    </span> */}
+                  </div>
+                ) : (
+                  <div className="flex items-baseline gap-3">
+                    <span className="text-4xl font-bold text-blue-600">
+                      ${getCurrentPrice()?.toFixed(2)}
+                    </span>
+                    <span className="text-lg text-slate-500">per unit</span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -235,12 +255,33 @@ export default function ProductDetailPage({ productId, onBack, onAddToCart }: Pr
                               )}
                             </div>
                             <div className="text-right flex-shrink-0">
-                              <p className="text-2xl font-bold text-blue-600">${variant.unit_price?.toFixed(2)}</p>
-                              <p className={`text-sm font-semibold mt-1 ${
-                                isAvailable ? 'text-green-600' : 'text-red-600'
-                              }`}>
-                                {isAvailable ? 'Available' : 'Out of Stock'}
-                              </p>
+                              {(variant.discount_price || product.discount_price) ? (
+                                <div className="text-right">
+                                  <p className="text-2xl font-bold text-red-600">
+                                    ${(variant.discount_price || product.discount_price)?.toFixed(2)}
+                                  </p>
+                                  <p className="text-sm text-slate-500 line-through">
+                                    ${(variant.original_price || product.original_price || variant.unit_price || product.unit_price)?.toFixed(2)}
+                                  </p>
+                                  <p className={`text-sm font-semibold mt-1 ${
+                                    isAvailable ? 'text-green-600' : 'text-red-600'
+                                  }`}>
+                                    {isAvailable ? 'Available' : 'Out of Stock'}
+                                  </p>
+                                  <div className="inline-block bg-red-100 text-red-800 text-xs px-2 py-1 rounded mt-1">
+                                    SALE
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="text-right">
+                                  <p className="text-2xl font-bold text-blue-600">${variant.unit_price?.toFixed(2)}</p>
+                                  <p className={`text-sm font-semibold mt-1 ${
+                                    isAvailable ? 'text-green-600' : 'text-red-600'
+                                  }`}>
+                                    {isAvailable ? 'Available' : 'Out of Stock'}
+                                  </p>
+                                </div>
+                              )}
                             </div>
                           </div>
                         </div>

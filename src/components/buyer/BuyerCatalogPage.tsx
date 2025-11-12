@@ -485,16 +485,33 @@ export default function BuyerCatalogPage() {
             )}
           </div>
           
-          <h3
-            onClick={() => setSelectedProductId(product.id)}
-            className="font-semibold text-slate-900 mb-1 cursor-pointer hover:text-blue-600 transition"
-          >
-            {product.name}
-          </h3>
+         <h3
+  onClick={() => setSelectedProductId(product.id)}
+  className="font-semibold text-slate-900 mb-1 cursor-pointer hover:text-blue-600 transition truncate"
+  title={product.name}
+>
+  {product.name.length > 50 ? `${product.name.substring(0, 50)}...` : product.name}
+</h3>
           
           <div className="flex items-baseline justify-between mb-2">
             <span className="text-2xl font-bold text-blue-600">
-              ${product.unit_price.toFixed(2)}
+{product.discount_price ? (
+  <div className="price-section">
+    <span className="original-price line-through text-slate-500 text-sm">
+      ${product.original_price}
+    </span>
+    <span className="discount-price text-red-600 font-bold text-lg ml-2">
+      ${product.discount_price}
+    </span>
+    <div className="save-badge bg-green-100 text-green-800 text-xs px-2 py-1 rounded mt-1">
+      Save ${(product.original_price - product.discount_price).toFixed(2)}
+    </div>
+  </div>
+) : (
+  <span className="regular-price text-lg font-semibold">
+    ${product.unit_price}
+  </span>
+)}
             </span>
             {product.has_variants && product.variant_count > 0 && (
               <span className="ml-2 text-xs text-slate-600">+{product.variant_count} variants</span>
@@ -582,7 +599,9 @@ export default function BuyerCatalogPage() {
                     />
                   </div>
                   <div className="flex-1">
-                    <h3 className="font-medium text-slate-900">{item.product.name}</h3>
+                   <h3 className="font-medium text-slate-900 truncate" title={item.product.name}>
+  {item.product.name.length > 40 ? `${item.product.name.substring(0, 40)}...` : item.product.name}
+</h3>
                     <p className="text-sm text-slate-600">
                       ${item.product.unit_price.toFixed(2)} each
                     </p>

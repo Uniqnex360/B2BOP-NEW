@@ -3,10 +3,11 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { X } from 'lucide-react';
 
+// Change the interface first
 interface PromotionModalProps {
   promotion?: any;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (createdPromotion?: any) => void; // Update to accept parameter
 }
 
 export default function PromotionModal({ promotion, onClose, onSuccess }: PromotionModalProps) {
@@ -44,55 +45,63 @@ export default function PromotionModal({ promotion, onClose, onSuccess }: Promot
     setProducts(prodRes.data || []);
   };
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
+ const handleSubmit = async (e: FormEvent) => {
+  e.preventDefault();
+  setLoading(true);
 
-    try {
-      const data: any = {
-        seller_id: profile!.id,
-        name: formData.name,
-        description: formData.description || null,
-        applies_to: formData.applies_to,
-        promotion_type: formData.promotion_type,
-        discount_value: parseFloat(formData.discount_value),
-        start_date: new Date(formData.start_date).toISOString(),
-        end_date: new Date(formData.end_date).toISOString(),
-        is_active: formData.is_active,
-        category_id: null,
-        brand_id: null,
-        product_id: null,
-        coupon_code: null,
-      };
+  try {
+    const data: any = {
+      seller_id: profile!.id,
+      name: formData.name,
+      description: formData.description || null,
+      applies_to: formData.applies_to,
+      promotion_type: formData.promotion_type,
+      discount_value: parseFloat(formData.discount_value),
+      start_date: new Date(formData.start_date).toISOString(),
+      end_date: new Date(formData.end_date).toISOString(),
+      is_active: formData.is_active,
+      category_id: null,
+      brand_id: null,
+      product_id: null,
+      coupon_code: null,
+    };
 
-      if (formData.applies_to === 'specific' && formData.target_id) {
-        if (formData.target_type === 'category') {
-          data.category_id = formData.target_id;
-        } else if (formData.target_type === 'brand') {
-          data.brand_id = formData.target_id;
-        } else if (formData.target_type === 'product') {
-          data.product_id = formData.target_id;
-        }
+    if (formData.applies_to === 'specific' && formData.target_id) {
+      if (formData.target_type === 'category') {
+        data.category_id = formData.target_id;
+      } else if (formData.target_type === 'brand') {
+        data.brand_id = formData.target_id;
+      } else if (formData.target_type === 'product') {
+        data.product_id = formData.target_id;
       }
-
-      if (promotion) {
-        const { error } = await supabase
-          .from('promotions')
-          .update(data)
-          .eq('id', promotion.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from('promotions').insert(data);
-        if (error) throw error;
-      }
-
-      onSuccess();
-    } catch (err: any) {
-      alert(err.message || 'Failed to save promotion');
-    } finally {
-      setLoading(false);
     }
-  };
+
+    let result;
+    if (promotion) {
+      const { data: updateData, error } = await supabase
+        .from('promotions')
+        .update(data)
+        .eq('id', promotion.id)
+        .select(); // Add .select() to get the updated record
+      if (error) throw error;
+      result = updateData?.[0];
+    } else {
+      const { data: insertData, error } = await supabase
+        .from('promotions')
+        .insert(data)
+        .select(); // Add .select() to get the created record
+      if (error) throw error;
+      result = insertData?.[0];
+    }
+
+    // Pass the created/updated promotion to onSuccess
+    onSuccess(result);
+  } catch (err: any) {
+    alert(err.message || 'Failed to save promotion');
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="fixed inset-0 bg-blue-600/50 z-50 flex items-center justify-center p-4">

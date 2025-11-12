@@ -1,7 +1,7 @@
-import { useState,useEffect} from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { ArrowLeft, CreditCard, Wallet, Building, DollarSign, Truck } from 'lucide-react';
+import { ArrowLeft, CreditCard, Wallet, Building, DollarSign, Truck, MapPin, Edit2 } from 'lucide-react';
 import { CardElement, Elements, useElements, useStripe } from '@stripe/react-stripe-js';
 import { stripePromise } from '../../lib/stripeConfig';
 
@@ -10,23 +10,42 @@ interface CheckoutPageProps {
   onBack: () => void;
   onSuccess: () => void;
 }
-export default function CheckoutWrapperPage(props:CheckoutPageProps)
-{
+
+export default function CheckoutWrapperPage(props: CheckoutPageProps) {
   return (
     <Elements stripe={stripePromise}>
-      <CheckoutPage {...props}/>
+      <CheckoutPage {...props} />
     </Elements>
-  )
+  );
 }
-export  function CheckoutPage({ cart, onBack, onSuccess }: CheckoutPageProps) {
-  const stripe=useStripe()
-  const elements=useElements()
+
+export function CheckoutPage({ cart, onBack, onSuccess }: CheckoutPageProps) {
+  const stripe = useStripe();
+  const elements = useElements();
   const { profile } = useAuth();
+  const [currentStep, setCurrentStep] = useState<'address' | 'payment'>('address');
   const [paymentMethod, setPaymentMethod] = useState<string>('');
   const [loading, setLoading] = useState(false);
-  const [buyerAddress,setBuyerAddress]=useState<any>(null)
+  const [addresses, setAddresses] = useState<any[]>([]);
+  const [selectedBillingAddress, setSelectedBillingAddress] = useState<any>(null);
+  const [selectedShippingAddress, setSelectedShippingAddress] = useState<any>(null);
+  const [showAddressForm, setShowAddressForm] = useState(false);
+  const [loadingAddress, setLoadingAddress] = useState(true);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
-  const [loadingAddress,setLoadingAddress]=useState(true)
+
+  // New address form state
+  const [newAddress, setNewAddress] = useState({
+    full_name: '',
+    phone: '',
+    address_line1: '',
+    address_line2: '',
+    city: '',
+    state: '',
+    postal_code: '',
+    country: 'USA',
+    address_type: 'both',
+    is_default: false
+  });
 
   // Payment form states
   const [cardNumber, setCardNumber] = useState('');
@@ -47,23 +66,85 @@ export  function CheckoutPage({ cart, onBack, onSuccess }: CheckoutPageProps) {
     { id: 'card', name: 'Debit/Credit Card', icon: CreditCard, description: 'Direct card payment' },
     { id: 'credit', name: 'Credit Terms', icon: Truck, description: 'Use credit limit' },
   ];
- 
-  useEffect(()=>{
-    const fetchAddress=async()=>{
-      if(!profile?.id)return
-      setLoadingAddress(true)
-     const { data, error } = await supabase.from('buyer_addresses').select('*').eq('buyer_id', profile.id).eq('is_default', true).maybeSingle();
-     console.log('dataatata',data)
-      if(!error && data)
-      {
-        setBuyerAddress(data)
-      }
-      setLoadingAddress(false)
-    }
-    fetchAddress()
 
-  },[profile])
-   
+  useEffect(() => {
+    const fetchAddresses = async () => {
+      if (!profile?.id) return;
+      setLoadingAddress(true);
+      const { data, error } = await supabase
+        .from('buyer_addresses')
+        .select('*')
+        .eq('buyer_id', profile.id)
+        .order('is_default', { ascending: false });
+
+      if (!error && data) {
+        setAddresses(data);
+        // Set default addresses
+        const defaultAddress = data.find(addr => addr.is_default);
+        if (defaultAddress) {
+          setSelectedBillingAddress(defaultAddress);
+          setSelectedShippingAddress(defaultAddress);
+        } else if (data.length > 0) {
+          setSelectedBillingAddress(data[0]);
+          setSelectedShippingAddress(data[0]);
+        }
+      }
+      setLoadingAddress(false);
+    };
+    fetchAddresses();
+  }, [profile]);
+
+  const handleAddAddress = async () => {
+    if (!newAddress.full_name || !newAddress.address_line1 || !newAddress.city || !newAddress.state || !newAddress.postal_code) {
+      alert('Please fill in all required address fields');
+      return;
+    }
+
+    try {
+      const addressData = {
+        buyer_id: profile!.id,
+        full_name: newAddress.full_name,
+        phone: newAddress.phone,
+        address_line1: newAddress.address_line1,
+        address_line2: newAddress.address_line2,
+        city: newAddress.city,
+        state: newAddress.state,
+        postal_code: newAddress.postal_code,
+        country: newAddress.country,
+        address_type: newAddress.address_type,
+        is_default: newAddress.is_default
+      };
+
+      const { error } = await supabase.from('buyer_addresses').insert(addressData);
+
+      if (error) throw error;
+
+      // Refresh addresses
+      const { data } = await supabase
+        .from('buyer_addresses')
+        .select('*')
+        .eq('buyer_id', profile.id)
+        .order('is_default', { ascending: false });
+
+      setAddresses(data || []);
+      setShowAddressForm(false);
+      setNewAddress({
+        full_name: '',
+        phone: '',
+        address_line1: '',
+        address_line2: '',
+        city: '',
+        state: '',
+        postal_code: '',
+        country: 'USA',
+        address_type: 'both',
+        is_default: false
+      });
+    } catch (error: any) {
+      alert('Failed to add address: ' + error.message);
+    }
+  };
+
   const handlePaymentMethodSelect = (method: string) => {
     setPaymentMethod(method);
     if (method === 'cod' || method === 'credit') {
@@ -71,184 +152,82 @@ export  function CheckoutPage({ cart, onBack, onSuccess }: CheckoutPageProps) {
     } else {
       setShowPaymentForm(true);
     }
-  }; 
-  if (loadingAddress) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-slate-600">Loading...</div>
-      </div>
-    );
-  }
+  };
 
-  if (!buyerAddress ) {
-  return (
-    <div className="p-8 text-center">
-      <h2 className="text-xl font-semibold mb-2">Address Missing</h2>
-      <p className="text-slate-600 mb-4">
-        Please add a default shipping address before checking out.
-      </p>
-      <button
-        onClick={onBack}
-        className="px-4 py-2 bg-slate-900 text-white rounded-lg"
-      >
-        Go Back
-      </button>
-    </div>
-  );
-}
-
-  const handleStripePayment=async()=>{
-    if(!stripe || !elements)
-    {
-      alert("Stripe has not loaded properly!")
-      return
+  const handleProceedToPayment = () => {
+    if (!selectedBillingAddress || !selectedShippingAddress) {
+      alert('Please select both billing and shipping addresses');
+      return;
     }
+    setCurrentStep('payment');
+  };
+
+  const handleStripePayment = async () => {
+    if (!stripe || !elements) {
+      alert("Stripe has not loaded properly!");
+      return;
+    }
+
     try {
-      const {data,error:paymentIntentError}=await supabase.functions.invoke('create-payment-intent',{
-        body:JSON.stringify({
-          amount:Math.round(total*100),
-          currency:"usd"
+      const { data, error: paymentIntentError } = await supabase.functions.invoke('create-payment-intent', {
+        body: JSON.stringify({
+          amount: Math.round(total * 100),
+          currency: "usd"
         })
-      })
-      if(paymentIntentError)
-      {
-        throw paymentIntentError
+      });
+
+      if (paymentIntentError) {
+        throw paymentIntentError;
       }
-      const cardElement=elements.getElement(CardElement)
+
+      const cardElement = elements.getElement(CardElement);
       const address = {
-  line1: buyerAddress?.address_line1?.trim() || 'N/A',
-  city: buyerAddress?.city?.replace(/,$/, '').trim() || 'N/A',
-  state: buyerAddress?.state?.trim() || 'N/A',
-  postal_code: buyerAddress?.postal_code?.trim() || '00000', 
-  country: buyerAddress?.country?.trim() === 'USA' ? 'US' : buyerAddress?.country?.trim() || 'US',
-};
-            console.log('Stripe billing address:', address);
+        line1: selectedBillingAddress?.address_line1?.trim() || 'N/A',
+        city: selectedBillingAddress?.city?.replace(/,$/, '').trim() || 'N/A',
+        state: selectedBillingAddress?.state?.trim() || 'N/A',
+        postal_code: selectedBillingAddress?.postal_code?.trim() || '00000',
+        country: selectedBillingAddress?.country?.trim() === 'USA' ? 'US' : selectedBillingAddress?.country?.trim() || 'US',
+      };
 
-
-      const {error,paymentIntent}=await stripe.confirmCardPayment(data.clientSecret,{
-        payment_method:{
-          card:cardElement!,
-          billing_details:{
-            name:cardName||buyerAddress?.full_name||profile?.full_name,
-            email:profile?.email,
-            phone:buyerAddress?.phone,
+      const { error, paymentIntent } = await stripe.confirmCardPayment(data.clientSecret, {
+        payment_method: {
+          card: cardElement!,
+          billing_details: {
+            name: cardName || selectedBillingAddress?.full_name || profile?.full_name,
+            email: profile?.email,
+            phone: selectedBillingAddress?.phone,
             address,
-
           }
         }
-      })
+      });
 
-      if(error)
-      {
-        throw error
-      }
-      console.log('Client Secret:', data.clientSecret);
-      if(paymentIntent && paymentIntent.status==='succeeded')
-      {
-        const orderNumber = 'ORD-' + Date.now().toString().slice(-8);
-         const { data: order, error: orderError } = await supabase
-        .from('orders')
-        .insert({
-          order_number: orderNumber,
-          buyer_id: profile!.id,
-          seller_id: profile!.seller_id,
-          status: 'pending',
-          payment_status: 'paid',
-          subtotal: subtotal,
-          payment_intent_id: paymentIntent.id,
-          tax_amount: tax,
-          total_amount: total,
-          notes: `Payment method: ${paymentMethod}`,
-        })
-        .select()
-        .single();
-
-      if (orderError) throw orderError;
-       const orderItems = cart.map((item) => ({
-        order_id: order.id,
-        product_id: item.product_id,
-        quantity: item.quantity,
-        unit_price: item.product.unit_price,
-        line_total: item.product.unit_price * item.quantity,
-      }));
-
-      const { error: itemsError } = await supabase.from('order_items').insert(orderItems);
-
-      if (itemsError) throw itemsError;
-       for (const item of cart) {
-        const { data: product } = await supabase
-          .from('products')
-          .select('stock_quantity')
-          .eq('id', item.product_id)
-          .single();
-
-        if (product) {
-          await supabase
-            .from('products')
-            .update({ stock_quantity: product.stock_quantity - item.quantity })
-            .eq('id', item.product_id);
-        }
+      if (error) {
+        throw error;
       }
 
-      alert(`Order placed successfully! Order #${orderNumber}`);
-      onSuccess();
-
+      if (paymentIntent && paymentIntent.status === 'succeeded') {
+        await createOrder(paymentIntent.id);
       }
-    } catch (error:any) {
-      console.error(`Payment failed ${error}`)
-      setLoading(false)
-      alert(`Payment failed ${error.message}`)
+    } catch (error: any) {
+      console.error(`Payment failed ${error}`);
+      setLoading(false);
+      alert(`Payment failed ${error.message}`);
+    } finally {
+      setLoading(false);
     }
-    finally{
-      setLoading(false)
-    }
-  }
+  };
 
-  const handlePlaceOrder = async () => {
-    if (!paymentMethod) {
-      alert('Please select a payment method');
-      return;
-    }
-    setLoading(true);
-    if (paymentMethod === 'stripe') {
-      await handleStripePayment();
-      return;
-    }
-    // Validate payment forms if needed
-    if (showPaymentForm && paymentMethod !== 'cod' && paymentMethod !== 'credit') {
-      if (paymentMethod === 'card' || paymentMethod === 'stripe') {
-        if (!cardNumber || !cardName || !cardExpiry || !cardCVV) {
-          alert('Please fill in all card details');
-          return;
-        }
-      } else if (paymentMethod === 'paypal') {
-        if (!paypalEmail) {
-          alert('Please enter your PayPal email');
-          return;
-        }
-      } else if (paymentMethod === 'netbanking') {
-        if (!bankName) {
-          alert('Please select your bank');
-          return;
-        }
-      }
-    }
-
-    
+  const createOrder = async (paymentIntentId?: string) => {
     try {
-      // Generate order number
       const orderNumber = 'ORD-' + Date.now().toString().slice(-8);
 
-      // Determine payment status based on method
       let paymentStatus = 'unpaid';
-      if (paymentMethod === 'cod') {
-        paymentStatus = 'unpaid';
-      } else if (paymentMethod === 'credit') {
+      if (paymentMethod === 'cod' || paymentMethod === 'credit') {
         paymentStatus = 'unpaid';
       } else {
-        // For online payments, mark as paid (in real app, wait for payment gateway response)
         paymentStatus = 'paid';
       }
+
       // Create order
       const { data: order, error: orderError } = await supabase
         .from('orders')
@@ -259,9 +238,12 @@ export  function CheckoutPage({ cart, onBack, onSuccess }: CheckoutPageProps) {
           status: 'pending',
           payment_status: paymentStatus,
           subtotal: subtotal,
+          payment_intent_id: paymentIntentId,
           tax_amount: tax,
           total_amount: total,
           notes: `Payment method: ${paymentMethod}`,
+          billing_address_id: selectedBillingAddress.id,
+          shipping_address_id: selectedShippingAddress.id,
         })
         .select()
         .single();
@@ -302,20 +284,394 @@ export  function CheckoutPage({ cart, onBack, onSuccess }: CheckoutPageProps) {
     } catch (err: any) {
       alert('Failed to place order: ' + err.message);
       setLoading(false);
-    } finally {
-      setLoading(false);
     }
   };
 
+  const handlePlaceOrder = async () => {
+    if (!paymentMethod) {
+      alert('Please select a payment method');
+      return;
+    }
+    setLoading(true);
+
+    if (paymentMethod === 'stripe') {
+      await handleStripePayment();
+      return;
+    }
+
+    // Validate payment forms if needed
+    if (showPaymentForm && paymentMethod !== 'cod' && paymentMethod !== 'credit') {
+      if (paymentMethod === 'card') {
+        if (!cardNumber || !cardName || !cardExpiry || !cardCVV) {
+          alert('Please fill in all card details');
+          return;
+        }
+      } else if (paymentMethod === 'paypal') {
+        if (!paypalEmail) {
+          alert('Please enter your PayPal email');
+          return;
+        }
+      } else if (paymentMethod === 'netbanking') {
+        if (!bankName) {
+          alert('Please select your bank');
+          return;
+        }
+      }
+    }
+
+    await createOrder();
+  };
+
+  const OrderSummary = () => (
+    <div className="bg-white rounded-xl border border-slate-200 p-6 sticky top-6">
+      <h2 className="text-lg font-semibold text-slate-900 mb-4">Order Summary</h2>
+      <div className="space-y-3 mb-4">
+        {cart.map((item) => (
+          <div key={item.product_id} className="flex justify-between text-sm">
+            <div className="flex-1">
+              <p className="font-medium text-slate-900">{item.product.name}</p>
+              <p className="text-slate-600">Qty: {item.quantity}</p>
+            </div>
+            <p className="font-medium text-slate-900">
+              ${(item.product.unit_price * item.quantity).toFixed(2)}
+            </p>
+          </div>
+        ))}
+      </div>
+      <div className="border-t border-slate-200 pt-4 space-y-2">
+        <div className="flex justify-between text-sm">
+          <span className="text-slate-600">Subtotal</span>
+          <span className="font-medium text-slate-900">${subtotal.toFixed(2)}</span>
+        </div>
+        <div className="flex justify-between text-sm">
+          <span className="text-slate-600">Tax (10%)</span>
+          <span className="font-medium text-slate-900">${tax.toFixed(2)}</span>
+        </div>
+        <div className="flex justify-between text-lg font-bold border-t border-slate-200 pt-2">
+          <span className="text-slate-900">Total</span>
+          <span className="text-slate-900">${total.toFixed(2)}</span>
+        </div>
+      </div>
+      {currentStep === 'payment' && (
+        <button
+          onClick={handlePlaceOrder}
+          disabled={!paymentMethod || loading || (paymentMethod === 'stripe' && (!stripe || !elements))}
+          className="w-full mt-6 px-4 py-3 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {loading ? 'Placing Order...' : 'Place Order'}
+        </button>
+      )}
+    </div>
+  );
+
+  if (loadingAddress) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-slate-600">Loading...</div>
+      </div>
+    );
+  }
+
+  // Address Step
+  if (currentStep === 'address') {
+    return (
+      <div className="max-w-6xl mx-auto space-y-6">
+        <div className="flex items-center gap-4">
+          <button onClick={onBack} className="p-2 hover:bg-slate-100 rounded-lg transition">
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900">Checkout</h1>
+            <p className="text-slate-600 mt-1">Step 1 of 2: Shipping & Billing Address</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Address Section */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Billing Address */}
+            <div className="bg-white rounded-xl border border-slate-200 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+                  <MapPin className="w-5 h-5" />
+                  Billing Address
+                </h2>
+                <button
+                  onClick={() => setShowAddressForm(true)}
+                  className="flex items-center gap-2 px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                >
+                  <Edit2 className="w-4 h-4" />
+                  Add New Address
+                </button>
+              </div>
+
+              {addresses.length === 0 ? (
+                <div className="text-center py-8 text-slate-600">
+                  <p>No addresses found. Please add an address to continue.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {addresses.map((address) => (
+                    <button
+                      key={address.id}
+                      onClick={() => setSelectedBillingAddress(address)}
+                      className={`p-4 border-2 rounded-lg text-left transition ${
+                        selectedBillingAddress?.id === address.id
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-slate-200 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <p className="font-medium text-slate-900">{address.full_name}</p>
+                        {address.is_default && (
+                          <span className="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
+                            Default
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-slate-600 mb-1">{address.phone}</p>
+                      <p className="text-sm text-slate-600">
+                        {address.address_line1}
+                        {address.address_line2 && `, ${address.address_line2}`}
+                      </p>
+                      <p className="text-sm text-slate-600">
+                        {address.city}, {address.state} {address.postal_code}
+                      </p>
+                      <p className="text-sm text-slate-600">{address.country}</p>
+                      <p className="text-xs text-slate-500 mt-2 capitalize">
+                        {address.address_type} address
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Shipping Address */}
+            <div className="bg-white rounded-xl border border-slate-200 p-6">
+              <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2 mb-4">
+                <MapPin className="w-5 h-5" />
+                Shipping Address
+              </h2>
+              {addresses.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {addresses.map((address) => (
+                    <button
+                      key={address.id}
+                      onClick={() => setSelectedShippingAddress(address)}
+                      className={`p-4 border-2 rounded-lg text-left transition ${
+                        selectedShippingAddress?.id === address.id
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-slate-200 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <p className="font-medium text-slate-900">{address.full_name}</p>
+                        {address.is_default && (
+                          <span className="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
+                            Default
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-slate-600 mb-1">{address.phone}</p>
+                      <p className="text-sm text-slate-600">
+                        {address.address_line1}
+                        {address.address_line2 && `, ${address.address_line2}`}
+                      </p>
+                      <p className="text-sm text-slate-600">
+                        {address.city}, {address.state} {address.postal_code}
+                      </p>
+                      <p className="text-sm text-slate-600">{address.country}</p>
+                      <p className="text-xs text-slate-500 mt-2 capitalize">
+                        {address.address_type} address
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Add Address Form */}
+            {showAddressForm && (
+              <div className="bg-white rounded-xl border border-slate-200 p-6">
+                <h3 className="text-lg font-semibold text-slate-900 mb-4">Add New Address</h3>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        Full Name *
+                      </label>
+                      <input
+                        type="text"
+                        value={newAddress.full_name}
+                        onChange={(e) => setNewAddress({ ...newAddress, full_name: e.target.value })}
+                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        Phone
+                      </label>
+                      <input
+                        type="tel"
+                        value={newAddress.phone}
+                        onChange={(e) => setNewAddress({ ...newAddress, phone: e.target.value })}
+                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Address Line 1 *
+                    </label>
+                    <input
+                      type="text"
+                      value={newAddress.address_line1}
+                      onChange={(e) => setNewAddress({ ...newAddress, address_line1: e.target.value })}
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Address Line 2
+                    </label>
+                    <input
+                      type="text"
+                      value={newAddress.address_line2}
+                      onChange={(e) => setNewAddress({ ...newAddress, address_line2: e.target.value })}
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        City *
+                      </label>
+                      <input
+                        type="text"
+                        value={newAddress.city}
+                        onChange={(e) => setNewAddress({ ...newAddress, city: e.target.value })}
+                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        State *
+                      </label>
+                      <input
+                        type="text"
+                        value={newAddress.state}
+                        onChange={(e) => setNewAddress({ ...newAddress, state: e.target.value })}
+                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        ZIP Code *
+                      </label>
+                      <input
+                        type="text"
+                        value={newAddress.postal_code}
+                        onChange={(e) => setNewAddress({ ...newAddress, postal_code: e.target.value })}
+                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        Country
+                      </label>
+                      <select
+                        value={newAddress.country}
+                        onChange={(e) => setNewAddress({ ...newAddress, country: e.target.value })}
+                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="USA">United States</option>
+                        <option value="CAN">Canada</option>
+                        <option value="MEX">Mexico</option>
+                        <option value="GBR">United Kingdom</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        Address Type
+                      </label>
+                      <select
+                        value={newAddress.address_type}
+                        onChange={(e) => setNewAddress({ ...newAddress, address_type: e.target.value })}
+                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="billing">Billing Only</option>
+                        <option value="shipping">Shipping Only</option>
+                        <option value="both">Both Billing & Shipping</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="is_default"
+                      checked={newAddress.is_default}
+                      onChange={(e) => setNewAddress({ ...newAddress, is_default: e.target.checked })}
+                      className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+                    />
+                    <label htmlFor="is_default" className="text-sm text-slate-700">
+                      Set as default address
+                    </label>
+                  </div>
+
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setShowAddressForm(false)}
+                      className="flex-1 px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleAddAddress}
+                      className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                    >
+                      Save Address
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <button
+              onClick={handleProceedToPayment}
+              disabled={!selectedBillingAddress || !selectedShippingAddress}
+              className="w-full px-4 py-3 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Proceed to Payment
+            </button>
+          </div>
+
+          {/* Order Summary */}
+          <div className="lg:col-span-1">
+            <OrderSummary />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Payment Step
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-6xl mx-auto space-y-6">
       <div className="flex items-center gap-4">
-        <button onClick={onBack} className="p-2 hover:bg-slate-100 rounded-lg transition">
+        <button onClick={() => setCurrentStep('address')} className="p-2 hover:bg-slate-100 rounded-lg transition">
           <ArrowLeft className="w-5 h-5" />
         </button>
         <div>
           <h1 className="text-3xl font-bold text-slate-900">Checkout</h1>
-          <p className="text-slate-600 mt-1">Complete your purchase</p>
+          <p className="text-slate-600 mt-1">Step 2 of 2: Payment Method</p>
         </div>
       </div>
 
@@ -358,7 +714,6 @@ export  function CheckoutPage({ cart, onBack, onSuccess }: CheckoutPageProps) {
               <div className='border border-slate-300  rounded-lg p-3'>
                 <CardElement options={{ style: { base: { fontSize: '14px' } }, hidePostalCode: true }} />
               </div>
-  
             </div>
           )}
 
@@ -467,7 +822,6 @@ export  function CheckoutPage({ cart, onBack, onSuccess }: CheckoutPageProps) {
             </div>
           )}
 
-
           {paymentMethod === 'credit' && (
             <div className="bg-white rounded-xl border border-slate-200 p-6">
               <h2 className="text-lg font-semibold text-slate-900 mb-4">Credit Terms</h2>
@@ -487,43 +841,7 @@ export  function CheckoutPage({ cart, onBack, onSuccess }: CheckoutPageProps) {
 
         {/* Order Summary */}
         <div className="lg:col-span-1">
-          <div className="bg-white rounded-xl border border-slate-200 p-6 sticky top-6">
-            <h2 className="text-lg font-semibold text-slate-900 mb-4">Order Summary</h2>
-            <div className="space-y-3 mb-4">
-              {cart.map((item) => (
-                <div key={item.product_id} className="flex justify-between text-sm">
-                  <div className="flex-1">
-                    <p className="font-medium text-slate-900">{item.product.name}</p>
-                    <p className="text-slate-600">Qty: {item.quantity}</p>
-                  </div>
-                  <p className="font-medium text-slate-900">
-                    ${(item.product.unit_price * item.quantity).toFixed(2)}
-                  </p>
-                </div>
-              ))}
-            </div>
-            <div className="border-t border-slate-200 pt-4 space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-600">Subtotal</span>
-                <span className="font-medium text-slate-900">${subtotal.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-600">Tax (10%)</span>
-                <span className="font-medium text-slate-900">${tax.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between text-lg font-bold border-t border-slate-200 pt-2">
-                <span className="text-slate-900">Total</span>
-                <span className="text-slate-900">${total.toFixed(2)}</span>
-              </div>
-            </div>
-            <button
-              onClick={handlePlaceOrder}
-              disabled={!paymentMethod || loading||(paymentMethod==='stripe' && !stripe||!elements)}
-              className="w-full mt-6 px-4 py-3 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? 'Placing Order...' : 'Place Order'}
-            </button>
-          </div>
+          <OrderSummary />
         </div>
       </div>
     </div>
