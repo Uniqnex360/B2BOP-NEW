@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
-import { Save, Building2, User, Mail, Phone, MapPin } from 'lucide-react';
+import { Save, Building2, User, Mail, Phone, MapPin, Plus, X } from 'lucide-react';
 
 export default function SettingsPage() {
   const { profile } = useAuth();
@@ -23,6 +23,19 @@ export default function SettingsPage() {
 
   // Local state for warehouse edits
   const [warehouseEdits, setWarehouseEdits] = useState<{[key: string]: any}>({});
+  
+  // State for new warehouse form
+  const [showAddWarehouseForm, setShowAddWarehouseForm] = useState(false);
+  const [newWarehouse, setNewWarehouse] = useState({
+    name: '',
+    address_line1: '',
+    address_line2: '',
+    city: '',
+    state: '',
+    postal_code: '',
+    country: ''
+  });
+  const [addingWarehouse, setAddingWarehouse] = useState(false);
 
   useEffect(() => {
     loadSettings();
@@ -101,33 +114,58 @@ export default function SettingsPage() {
   };
 
   const handleAddWarehouse = async () => {
-    if (!profile?.id) return;
+    if (!profile?.id || !newWarehouse.name.trim()) return;
 
-    const name = prompt('Enter warehouse name:');
-    if (!name) return;
-
+    setAddingWarehouse(true);
     try {
       const { data, error } = await supabase
         .from('warehouses')
         .insert({
           seller_id: profile.id,
-          name,
-          address_line1: '',
-          city: '',
-          state: '',
-          postal_code: '',
-          country: '',
+          name: newWarehouse.name.trim(),
+          address_line1: newWarehouse.address_line1,
+          address_line2: newWarehouse.address_line2,
+          city: newWarehouse.city,
+          state: newWarehouse.state,
+          postal_code: newWarehouse.postal_code,
+          country: newWarehouse.country,
           is_active: true
         })
         .select()
         .single();
 
       if (error) throw error;
+      
       setWarehouses([...warehouses, data]);
+      setNewWarehouse({
+        name: '',
+        address_line1: '',
+        address_line2: '',
+        city: '',
+        state: '',
+        postal_code: '',
+        country: ''
+      });
+      setShowAddWarehouseForm(false);
     } catch (error) {
       console.error('Error adding warehouse:', error);
       alert('Failed to add warehouse');
+    } finally {
+      setAddingWarehouse(false);
     }
+  };
+
+  const handleCancelAddWarehouse = () => {
+    setNewWarehouse({
+      name: '',
+      address_line1: '',
+      address_line2: '',
+      city: '',
+      state: '',
+      postal_code: '',
+      country: ''
+    });
+    setShowAddWarehouseForm(false);
   };
 
   // Handle warehouse field changes locally
@@ -228,26 +266,158 @@ export default function SettingsPage() {
             Warehouses
           </h2>
           <button
-            onClick={handleAddWarehouse}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm"
+            onClick={() => setShowAddWarehouseForm(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm"
           >
+            <Plus className="w-4 h-4" />
             Add Warehouse
           </button>
         </div>
         <div className="p-6">
+          {/* Add Warehouse Form */}
+          {showAddWarehouseForm && (
+            <div className="border-2 border-blue-200 rounded-lg p-6 mb-6 bg-blue-50">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Add New Warehouse</h3>
+                <button
+                  onClick={handleCancelAddWarehouse}
+                  className="p-1 text-gray-500 hover:text-gray-700 transition"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Warehouse Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={newWarehouse.name}
+                    onChange={(e) => setNewWarehouse(prev => ({ ...prev, name: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Enter warehouse name"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Address Line 1
+                    </label>
+                    <input
+                      type="text"
+                      value={newWarehouse.address_line1}
+                      onChange={(e) => setNewWarehouse(prev => ({ ...prev, address_line1: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Street address"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Address Line 2
+                    </label>
+                    <input
+                      type="text"
+                      value={newWarehouse.address_line2}
+                      onChange={(e) => setNewWarehouse(prev => ({ ...prev, address_line2: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Suite, unit, building, etc."
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
+                    <input
+                      type="text"
+                      value={newWarehouse.city}
+                      onChange={(e) => setNewWarehouse(prev => ({ ...prev, city: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="City"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
+                    <input
+                      type="text"
+                      value={newWarehouse.state}
+                      onChange={(e) => setNewWarehouse(prev => ({ ...prev, state: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="State"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Postal Code</label>
+                    <input
+                      type="text"
+                      value={newWarehouse.postal_code}
+                      onChange={(e) => setNewWarehouse(prev => ({ ...prev, postal_code: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="ZIP / Postal code"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
+                  <input
+                    type="text"
+                    value={newWarehouse.country}
+                    onChange={(e) => setNewWarehouse(prev => ({ ...prev, country: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Country"
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    onClick={handleAddWarehouse}
+                    disabled={addingWarehouse || !newWarehouse.name.trim()}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
+                  >
+                    <Plus className="w-4 h-4" />
+                    {addingWarehouse ? 'Adding...' : 'Add Warehouse'}
+                  </button>
+                  <button
+                    onClick={handleCancelAddWarehouse}
+                    className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Existing Warehouses List */}
           {warehouses.length === 0 ? (
-            <p className="text-gray-500 text-center py-8">No warehouses added yet</p>
+            <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-lg">
+              <Building2 className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-500 text-lg mb-2">No warehouses added yet</p>
+              <p className="text-gray-400 text-sm mb-4">Add your first warehouse to get started</p>
+              <button
+                onClick={() => setShowAddWarehouseForm(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition mx-auto"
+              >
+                <Plus className="w-4 h-4" />
+                Add Warehouse
+              </button>
+            </div>
           ) : (
             <div className="space-y-6">
               {warehouses.map((warehouse) => (
-                <div key={warehouse.id} className="border border-gray-200 rounded-lg p-4">
+                <div key={warehouse.id} className="border border-gray-200 rounded-lg p-6">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="font-semibold text-gray-900">Warehouse Details</h3>
                     {hasUnsavedChanges(warehouse.id) && (
                       <button
                         onClick={() => handleSaveWarehouse(warehouse.id)}
-                        className="px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm"
+                        className="flex items-center gap-2 px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm"
                       >
+                        <Save className="w-3 h-3" />
                         Save Changes
                       </button>
                     )}
