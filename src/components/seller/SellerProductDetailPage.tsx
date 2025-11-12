@@ -77,7 +77,7 @@ export default function SellerProductDetailPage({ productId, onBack, onEdit }: S
   const totalValue = product.has_variants
     ? variants.reduce((sum, v) => sum + (v.stock_quantity || 0) * (v.unit_price || 0), 0)
     : (product.stock_quantity || 0) * (product.unit_price || 0);
-
+  console.log('variants',variants)
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">

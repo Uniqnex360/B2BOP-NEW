@@ -76,7 +76,7 @@ export default function ProductDetailPage({ productId, onBack, onAddToCart }: Pr
       setInWishlist(true);
     }
   };
-
+  console.log('variants',variants)
   const handleAddToCart = () => {
     if (product && onAddToCart) {
       const itemToAdd = selectedVariant ? { ...product, ...selectedVariant, variant_id: selectedVariant.id } : product;

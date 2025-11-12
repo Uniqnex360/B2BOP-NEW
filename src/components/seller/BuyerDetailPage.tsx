@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { ArrowLeft, Plus, Trash2, Edit2, CreditCard, TrendingUp, Package, ShoppingBag,MapPin } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Edit2, CreditCard, TrendingUp, Package, ShoppingBag, MapPin, X } from 'lucide-react';
 
 interface BuyerDetailPageProps {
   buyerId: string;
@@ -26,6 +26,24 @@ export default function BuyerDetailPage({ buyerId, onBack }: BuyerDetailPageProp
     targetId: '',
     percentage: '',
   });
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editForm, setEditForm] = useState({
+    firstName: '',
+    lastName: '',
+    companyName: '',
+    businessName: '',
+    email: '',
+    phone: '',
+    creditDays: '30',
+    creditLimit: '',
+    // Address fields
+    addressLine1: '',
+    addressLine2: '',
+    city: '',
+    state: '',
+    postalCode: '',
+    country: 'USA',
+  });
 
   useEffect(() => {
     loadData();
@@ -34,7 +52,7 @@ export default function BuyerDetailPage({ buyerId, onBack }: BuyerDetailPageProp
   const loadData = async () => {
     setLoading(true);
 
-    const [buyerRes,addressRes, creditRes, discountsRes, categoriesRes, brandsRes, productsRes, ordersRes] = await Promise.all([
+    const [buyerRes, addressRes, creditRes, discountsRes, categoriesRes, brandsRes, productsRes, ordersRes] = await Promise.all([
       supabase.from('user_profiles').select('*').eq('id', buyerId).single(),
       supabase.from('buyer_addresses').select('*').eq('buyer_id', buyerId).eq('is_default', true).maybeSingle(),
       supabase.from('buyer_credit_terms').select('*').eq('buyer_id', buyerId).eq('seller_id', profile!.id).maybeSingle(),
@@ -46,7 +64,7 @@ export default function BuyerDetailPage({ buyerId, onBack }: BuyerDetailPageProp
     ]);
 
     setBuyer(buyerRes.data);
-    setAddress(addressRes.data)
+    setAddress(addressRes.data);
     setCreditTerms(creditRes.data);
     setDiscounts(discountsRes.data || []);
     setCategories(categoriesRes.data || []);
@@ -55,7 +73,108 @@ export default function BuyerDetailPage({ buyerId, onBack }: BuyerDetailPageProp
     setOrders(ordersRes.data || []);
     setLoading(false);
   };
-  console.log('address',address)
+
+  const handleEditBuyer = () => {
+    setEditForm({
+      firstName: buyer.first_name || '',
+      lastName: buyer.last_name || '',
+      companyName: buyer.company_name || '',
+      businessName: buyer.business_name || '',
+      email: buyer.email || '',
+      phone: buyer.phone || '',
+      creditDays: creditTerms?.credit_days?.toString() || '30',
+      creditLimit: creditTerms?.credit_limit?.toString() || '',
+      // Address fields
+      addressLine1: address?.address_line1 || '',
+      addressLine2: address?.address_line2 || '',
+      city: address?.city || '',
+      state: address?.state || '',
+      postalCode: address?.postal_code || '',
+      country: address?.country || 'USA',
+    });
+    setShowEditModal(true);
+  };
+
+  const handleUpdateBuyer = async () => {
+    try {
+      // Update user profile
+      const { error: profileError } = await supabase
+        .from('user_profiles')
+        .update({
+          first_name: editForm.firstName,
+          last_name: editForm.lastName,
+          company_name: editForm.companyName || null,
+          business_name: editForm.businessName || null,
+          phone: editForm.phone || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', buyerId);
+
+      if (profileError) throw profileError;
+
+      // Update credit terms
+      const { error: creditError } = await supabase
+        .from('buyer_credit_terms')
+        .upsert({
+          buyer_id: buyerId,
+          seller_id: profile!.id,
+          credit_days: parseInt(editForm.creditDays),
+          credit_limit: editForm.creditLimit ? parseFloat(editForm.creditLimit) : 0,
+          is_active: true,
+          updated_at: new Date().toISOString(),
+        }, {
+          onConflict: 'buyer_id,seller_id'
+        });
+
+      if (creditError) throw creditError;
+
+      // Update address
+      if (address) {
+        // Update existing address
+        const { error: addressError } = await supabase
+          .from('buyer_addresses')
+          .update({
+            full_name: `${editForm.firstName} ${editForm.lastName}`.trim(),
+            phone: editForm.phone || null,
+            address_line1: editForm.addressLine1,
+            address_line2: editForm.addressLine2 || null,
+            city: editForm.city,
+            state: editForm.state,
+            postal_code: editForm.postalCode,
+            country: editForm.country,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', address.id);
+
+        if (addressError) throw addressError;
+      } else {
+        // Create new address if doesn't exist
+        const { error: addressError } = await supabase
+          .from('buyer_addresses')
+          .insert({
+            buyer_id: buyerId,
+            full_name: `${editForm.firstName} ${editForm.lastName}`.trim(),
+            phone: editForm.phone || null,
+            address_line1: editForm.addressLine1,
+            address_line2: editForm.addressLine2 || null,
+            city: editForm.city,
+            state: editForm.state,
+            postal_code: editForm.postalCode,
+            country: editForm.country,
+            address_type: 'billing',
+            is_default: true,
+          });
+
+        if (addressError) throw addressError;
+      }
+
+      setShowEditModal(false);
+      loadData(); // Reload data to reflect changes
+    } catch (err: any) {
+      alert(err.message || 'Failed to update buyer');
+    }
+  };
+
   const handleAddDiscount = async () => {
     if (!newDiscount.targetId || !newDiscount.percentage) {
       alert('Please fill all fields');
@@ -140,7 +259,247 @@ export default function BuyerDetailPage({ buyerId, onBack }: BuyerDetailPageProp
           <h1 className="text-3xl font-bold text-slate-900">{buyer.business_name || buyer.company_name}</h1>
           <p className="text-slate-600 mt-1">{buyer.first_name} {buyer.last_name} • {buyer.email}</p>
         </div>
+        <button
+          onClick={handleEditBuyer}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+        >
+          <Edit2 className="w-4 h-4" />
+          Edit Buyer
+        </button>
       </div>
+
+      {/* Edit Buyer Modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-6 border-b border-slate-200">
+              <h2 className="text-2xl font-bold text-slate-900">Edit Buyer</h2>
+              <button 
+                onClick={() => setShowEditModal(false)}
+                className="p-2 hover:bg-slate-100 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    First Name
+                  </label>
+                  <input
+                    type="text"
+                    value={editForm.firstName}
+                    onChange={(e) => setEditForm({ ...editForm, firstName: e.target.value })}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Last Name
+                  </label>
+                  <input
+                    type="text"
+                    value={editForm.lastName}
+                    onChange={(e) => setEditForm({ ...editForm, lastName: e.target.value })}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Company Name
+                  </label>
+                  <input
+                    type="text"
+                    value={editForm.companyName}
+                    onChange={(e) => setEditForm({ ...editForm, companyName: e.target.value })}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Business Name
+                  </label>
+                  <input
+                    type="text"
+                    value={editForm.businessName}
+                    onChange={(e) => setEditForm({ ...editForm, businessName: e.target.value })}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    value={editForm.email}
+                    onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    disabled
+                  />
+                  <p className="text-xs text-slate-500 mt-1">Email cannot be changed</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Phone
+                  </label>
+                  <input
+                    type="tel"
+                    value={editForm.phone}
+                    onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
+
+              {/* Address Section */}
+              <div className="border-t border-slate-200 pt-6">
+                <h3 className="text-lg font-semibold text-slate-900 mb-4">Billing Address</h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Address Line 1
+                    </label>
+                    <input
+                      type="text"
+                      value={editForm.addressLine1}
+                      onChange={(e) => setEditForm({ ...editForm, addressLine1: e.target.value })}
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Address Line 2
+                    </label>
+                    <input
+                      type="text"
+                      value={editForm.addressLine2}
+                      onChange={(e) => setEditForm({ ...editForm, addressLine2: e.target.value })}
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        City
+                      </label>
+                      <input
+                        type="text"
+                        value={editForm.city}
+                        onChange={(e) => setEditForm({ ...editForm, city: e.target.value })}
+                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        State
+                      </label>
+                      <input
+                        type="text"
+                        value={editForm.state}
+                        onChange={(e) => setEditForm({ ...editForm, state: e.target.value })}
+                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        ZIP Code
+                      </label>
+                      <input
+                        type="text"
+                        value={editForm.postalCode}
+                        onChange={(e) => setEditForm({ ...editForm, postalCode: e.target.value })}
+                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Country
+                    </label>
+                    <select
+                      value={editForm.country}
+                      onChange={(e) => setEditForm({ ...editForm, country: e.target.value })}
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="USA">United States</option>
+                      <option value="CAN">Canada</option>
+                      <option value="MEX">Mexico</option>
+                      <option value="GBR">United Kingdom</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Credit Terms */}
+              <div className="border-t border-slate-200 pt-6">
+                <h3 className="text-lg font-semibold text-slate-900 mb-4">Credit Terms</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Credit Days
+                    </label>
+                    <select
+                      value={editForm.creditDays}
+                      onChange={(e) => setEditForm({ ...editForm, creditDays: e.target.value })}
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="0">Pay Now (0 days)</option>
+                      <option value="30">Net 30 days</option>
+                      <option value="60">Net 60 days</option>
+                      <option value="90">Net 90 days</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Credit Limit ($)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={editForm.creditLimit}
+                      onChange={(e) => setEditForm({ ...editForm, creditLimit: e.target.value })}
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-6 border-t border-slate-200">
+                <button
+                  onClick={() => setShowEditModal(false)}
+                  className="flex-1 px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleUpdateBuyer}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                >
+                  Update Buyer
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="border-b border-slate-200">
@@ -177,208 +536,178 @@ export default function BuyerDetailPage({ buyerId, onBack }: BuyerDetailPageProp
       {/* Tab Content */}
       {activeTab === 'details' ? (
         <>
-      {/* Credit Terms Card */}
-      {/* <div className="bg-white rounded-xl border border-slate-200 p-6">
-        <div className="flex items-center gap-3 mb-4">
-          <CreditCard className="w-6 h-6 text-slate-700" />
-          <h2 className="text-xl font-bold text-slate-900">Credit Terms</h2>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div>
-            <p className="text-sm text-slate-600 mb-1">Credit Limit</p>
-            <p className="text-2xl font-bold text-slate-900">
-              ${creditTerms?.credit_limit?.toFixed(2) || '0.00'}
-            </p>
-          </div>
-          <div>
-            <p className="text-sm text-slate-600 mb-1">Credit Days</p>
-            <p className="text-2xl font-bold text-slate-900">
-              {creditTerms?.credit_days || 0} days
-            </p>
-          </div>
-          <div>
-            <p className="text-sm text-slate-600 mb-1">Status</p>
-            <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
-              creditTerms?.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-            }`}>
-              {creditTerms?.is_active ? 'Active' : 'Inactive'}
-            </span>
-          </div>
-        </div>
-      </div> */}
-      <div className="bg-white rounded-xl border border-slate-200 p-6">
-  <div className="flex items-center gap-3 mb-4">
-    <MapPin className="w-6 h-6 text-slate-700" />
-    <h2 className="text-xl font-bold text-slate-900">Address</h2>
-  </div>
-  {address ? (
-    <div className="text-slate-900 space-y-1">
-      <p className="font-medium">{address.full_name}</p>
-      <p>{address.phone}</p>
-      <p>
-        {address.address_line1}
-        {address.address_line2 ? `, ${address.address_line2}` : ''}
-      </p>
-      <p>
-        {address.city}, {address.state} {address.postal_code}
-      </p>
-      <p>{address.country}</p>
-    </div>
-  ) : (
-    <p className="text-slate-600">No address found</p>
-  )}
-</div>
-
-
-
-      {/* Discounts Section */}
-      <div className="bg-white rounded-xl border border-slate-200 p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <TrendingUp className="w-6 h-6 text-slate-700" />
-            <h2 className="text-xl font-bold text-slate-900">Applied Discounts</h2>
-          </div>
-          <button
-            onClick={() => setShowAddDiscount(!showAddDiscount)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-          >
-            <Plus className="w-4 h-4" />
-            Add Discount
-          </button>
-        </div>
-
-        {/* Add Discount Form */}
-        {showAddDiscount && (
-          <div className="mb-6 p-4 bg-slate-50 rounded-lg border border-slate-200">
-            <h3 className="font-medium text-slate-900 mb-4">Add New Discount</h3>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Type</label>
-                <select
-                  value={newDiscount.type}
-                  onChange={(e) => setNewDiscount({ ...newDiscount, type: e.target.value, targetId: '' })}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="category">Category</option>
-                  <option value="brand">Brand</option>
-                  <option value="product">Product</option>
-                </select>
+          {/* Address Card */}
+          <div className="bg-white rounded-xl border border-slate-200 p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <MapPin className="w-6 h-6 text-slate-700" />
+              <h2 className="text-xl font-bold text-slate-900">Address</h2>
+            </div>
+            {address ? (
+              <div className="text-slate-900 space-y-1">
+                <p className="font-medium">{address.full_name}</p>
+                <p>{address.phone}</p>
+                <p>
+                  {address.address_line1}
+                  {address.address_line2 ? `, ${address.address_line2}` : ''}
+                </p>
+                <p>
+                  {address.city}, {address.state} {address.postal_code}
+                </p>
+                <p>{address.country}</p>
               </div>
+            ) : (
+              <p className="text-slate-600">No address found</p>
+            )}
+          </div>
 
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  {newDiscount.type === 'category' ? 'Category' : newDiscount.type === 'brand' ? 'Brand' : 'Product'}
-                </label>
-                <select
-                  value={newDiscount.targetId}
-                  onChange={(e) => setNewDiscount({ ...newDiscount, targetId: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="">Select...</option>
-                  {newDiscount.type === 'category' && categories.map((cat) => (
-                    <option key={cat.id} value={cat.id}>{cat.name}</option>
-                  ))}
-                  {newDiscount.type === 'brand' && brands.map((brand) => (
-                    <option key={brand.id} value={brand.id}>{brand.name}</option>
-                  ))}
-                  {newDiscount.type === 'product' && products.map((prod) => (
-                    <option key={prod.id} value={prod.id}>{prod.name} ({prod.sku})</option>
-                  ))}
-                </select>
+          {/* Discounts Section */}
+          <div className="bg-white rounded-xl border border-slate-200 p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <TrendingUp className="w-6 h-6 text-slate-700" />
+                <h2 className="text-xl font-bold text-slate-900">Applied Discounts</h2>
               </div>
+              <button
+                onClick={() => setShowAddDiscount(!showAddDiscount)}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+              >
+                <Plus className="w-4 h-4" />
+                Add Discount
+              </button>
+            </div>
 
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Discount %</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  max="100"
-                  value={newDiscount.percentage}
-                  onChange={(e) => setNewDiscount({ ...newDiscount, percentage: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="10.00"
-                />
+            {/* Add Discount Form */}
+            {showAddDiscount && (
+              <div className="mb-6 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                <h3 className="font-medium text-slate-900 mb-4">Add New Discount</h3>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Type</label>
+                    <select
+                      value={newDiscount.type}
+                      onChange={(e) => setNewDiscount({ ...newDiscount, type: e.target.value, targetId: '' })}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="category">Category</option>
+                      <option value="brand">Brand</option>
+                      <option value="product">Product</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      {newDiscount.type === 'category' ? 'Category' : newDiscount.type === 'brand' ? 'Brand' : 'Product'}
+                    </label>
+                    <select
+                      value={newDiscount.targetId}
+                      onChange={(e) => setNewDiscount({ ...newDiscount, targetId: e.target.value })}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="">Select...</option>
+                      {newDiscount.type === 'category' && categories.map((cat) => (
+                        <option key={cat.id} value={cat.id}>{cat.name}</option>
+                      ))}
+                      {newDiscount.type === 'brand' && brands.map((brand) => (
+                        <option key={brand.id} value={brand.id}>{brand.name}</option>
+                      ))}
+                      {newDiscount.type === 'product' && products.map((prod) => (
+                        <option key={prod.id} value={prod.id}>{prod.name} ({prod.sku})</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Discount %</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max="100"
+                      value={newDiscount.percentage}
+                      onChange={(e) => setNewDiscount({ ...newDiscount, percentage: e.target.value })}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="10.00"
+                    />
+                  </div>
+
+                  <div className="flex items-end gap-2">
+                    <button
+                      onClick={handleAddDiscount}
+                      className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                    >
+                      Add
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowAddDiscount(false);
+                        setNewDiscount({ type: 'category', targetId: '', percentage: '' });
+                      }}
+                      className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
               </div>
+            )}
 
-              <div className="flex items-end gap-2">
-                <button
-                  onClick={handleAddDiscount}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-                >
-                  Add
-                </button>
-                <button
-                  onClick={() => {
-                    setShowAddDiscount(false);
-                    setNewDiscount({ type: 'category', targetId: '', percentage: '' });
-                  }}
-                  className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition"
-                >
-                  Cancel
-                </button>
+            {/* Discounts List */}
+            {discounts.length === 0 ? (
+              <div className="text-center py-12 text-slate-600">
+                <p>No discounts applied yet</p>
+                <p className="text-sm mt-2">Click "Add Discount" to create one</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {discounts.map((discount) => (
+                  <div
+                    key={discount.id}
+                    className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-200 hover:border-slate-300 transition"
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3">
+                        <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
+                          {discount.discount_percentage}% OFF
+                        </span>
+                        <span className="font-medium text-slate-900">
+                          {getDiscountLabel(discount)}
+                        </span>
+                        <span className="text-sm text-slate-600 capitalize">
+                          ({discount.discount_type})
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleDeleteDiscount(discount.id)}
+                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Available to Add Section */}
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
+            <h3 className="font-medium text-blue-900 mb-3">Available Discount Types</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+              <div>
+                <p className="font-medium text-blue-900">Category Discounts</p>
+                <p className="text-blue-700">{categories.length} categories available</p>
+              </div>
+              <div>
+                <p className="font-medium text-blue-900">Brand Discounts</p>
+                <p className="text-blue-700">{brands.length} brands available</p>
+              </div>
+              <div>
+                <p className="font-medium text-blue-900">Product Discounts</p>
+                <p className="text-blue-700">{products.length} products available</p>
               </div>
             </div>
           </div>
-        )}
-
-        {/* Discounts List */}
-        {discounts.length === 0 ? (
-          <div className="text-center py-12 text-slate-600">
-            <p>No discounts applied yet</p>
-            <p className="text-sm mt-2">Click "Add Discount" to create one</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {discounts.map((discount) => (
-              <div
-                key={discount.id}
-                className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-200 hover:border-slate-300 transition"
-              >
-                <div className="flex-1">
-                  <div className="flex items-center gap-3">
-                    <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
-                      {discount.discount_percentage}% OFF
-                    </span>
-                    <span className="font-medium text-slate-900">
-                      {getDiscountLabel(discount)}
-                    </span>
-                    <span className="text-sm text-slate-600 capitalize">
-                      ({discount.discount_type})
-                    </span>
-                  </div>
-                </div>
-                <button
-                  onClick={() => handleDeleteDiscount(discount.id)}
-                  className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Available to Add Section */}
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
-        <h3 className="font-medium text-blue-900 mb-3">Available Discount Types</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-          <div>
-            <p className="font-medium text-blue-900">Category Discounts</p>
-            <p className="text-blue-700">{categories.length} categories available</p>
-          </div>
-          <div>
-            <p className="font-medium text-blue-900">Brand Discounts</p>
-            <p className="text-blue-700">{brands.length} brands available</p>
-          </div>
-          <div>
-            <p className="font-medium text-blue-900">Product Discounts</p>
-            <p className="text-blue-700">{products.length} products available</p>
-          </div>
-        </div>
-      </div>
-      </>
+        </>
       ) : (
         <div className="bg-white rounded-xl border border-slate-200">
           <div className="p-6 border-b border-slate-200">
