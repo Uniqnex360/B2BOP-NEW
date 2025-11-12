@@ -409,7 +409,7 @@ export default function ProductsPage() {
       alert("Failed to export products");
     }
   };
-
+ 
   if (viewingProductId) {
     return (
       <SellerProductDetailPage

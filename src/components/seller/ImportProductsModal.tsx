@@ -101,20 +101,180 @@ export default function ImportProductsModal({
 
   return null;
 }
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+//   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+//     const file = e.target.files?.[0];
+//     if (!file) return;
 
-    setLoading(true);
-    setError("");
-    setResults(null);
+//     setLoading(true);
+//     setError("");
+//     setResults(null);
 
+//     const data = await file.arrayBuffer();
+//     const workbook = XLSX.read(data);
+//     const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+
+//     // Convert to JSON with headers as keys
+//     const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[]
+
+//     if (!jsonData.length) {
+//       throw new Error("File is empty or invalid");
+//     }
+
+//     // DEBUG: Log all column names from first row
+//     console.log('All columns in first row:', Object.keys(jsonData[0]));
+
+//     let successCount = 0;
+//     let failedCount = 0;
+//     let productsCreated = 0;
+//     let variantsCreated = 0;
+//     let currentProduct: any = null;
+//     let currentProductId: string | null = null;
+
+//     for (let i = 0; i < jsonData.length; i++) {
+//       const rowData = jsonData[i] as any;
+
+//       const itemType = rowData["item type"]?.toString().trim().toLowerCase();
+//       const sku = rowData["sku"]?.toString().trim();
+
+//       if (!sku) continue;
+
+//       try {
+//         if (itemType === "product") {
+//           const productName = rowData['product name']?.toString().trim();
+//           const brand = rowData['brand']?.toString().trim();
+//           const category = rowData['category_1']?.toString().trim();
+//           const description = rowData['description']?.toString().trim();
+//           const unitPrice = rowData['unit price']?.toString().trim();
+//           const costPrice = rowData['cost price']?.toString().trim();
+//           const stockQty = rowData["stock quantity"]?.toString().trim();
+//           const minOrderQty = rowData['min order qty']?.toString().trim();
+//           const maxOrderQty = rowData['max order qty']?.toString().trim();
+//           const uom = rowData['unit of measure']?.toString().trim() || "unit";
+          
+//           // More robust image URL extraction
+//           const imageUrl = findImageUrl(rowData);
+          
+//           console.log(`Processing ${sku}:`, { imageUrl });
+
+//           let categoryId = null;
+//           let brandId = null;
+
+//           if (category) {
+//             const { data: cat } = await supabase
+//               .from("categories")
+//               .select("id")
+//               .eq("seller_id", profile!.id)
+//               .ilike("name", category)
+//               .maybeSingle();
+
+//             if (!cat) {
+//               const { data: newCat } = await supabase
+//                 .from("categories")
+//                 .insert({
+//                   seller_id: profile!.id,
+//                   name: category,
+//                   is_active: true,
+//                 })
+//                 .select()
+//                 .single();
+//               categoryId = newCat?.id;
+//             } else {
+//               categoryId = cat.id;
+//             }
+//           }
+
+//           if (brand) {
+//             const { data: brnd } = await supabase
+//               .from("brands")
+//               .select("id")
+//               .eq("seller_id", profile!.id)
+//               .ilike("name", brand)
+//               .maybeSingle();
+
+//             if (!brnd) {
+//               const { data: newBrand } = await supabase
+//                 .from("brands")
+//                 .insert({
+//                   seller_id: profile!.id,
+//                   name: brand,
+//                   is_active: true,
+//                 })
+//                 .select()
+//                 .single();
+//               brandId = newBrand?.id;
+//             } else {
+//               brandId = brnd.id;
+//             }
+//           }
+
+//           const hasVariants = i + 1 < jsonData.length && (jsonData[i + 1] as any)['item type']?.toString().trim().toLowerCase() === "variant";
+
+//           const { data: product, error: prodError } = await supabase
+//             .from("products")
+//             .insert({
+//               seller_id: profile!.id,
+//               parent_sku: sku,
+//               sku: sku,
+//               vendor_name: rowData['vendor name']?.trim() || null,
+//               features: rowData["features"]?.trim() || null,
+//               specifications: rowData['Specifications (Name: Value)']?.trim() || null,
+//               name: productName,
+//               description: description || null,
+//               category_id: categoryId,
+//               brand_id: brandId,
+//               unit_price: parseFloat(unitPrice) || 0,
+//               cost_price: parseFloat(costPrice) || 0,
+//               stock_quantity: parseInt(stockQty) || 0,
+//               min_order_quantity: parseInt(minOrderQty) || 1,
+//               max_order_quantity: maxOrderQty ? parseInt(maxOrderQty) : null,
+//               unit_of_measure: uom,
+//               image_url: imageUrl || null,
+//               has_variants: hasVariants,
+//               is_visible: rowData['is visible']
+//                 ? rowData['is visible'].toString().trim().toLowerCase() === "true"
+//                 : true,
+//               is_active:
+//                 rowData['is active']?.toString().trim().toLowerCase() === "true" || true,
+//             })
+//             .select()
+//             .single();
+
+//           if (prodError) {
+//             console.error("Product insert error:", prodError);
+//             failedCount++;
+//             currentProduct = null;
+//             currentProductId = null;
+//             continue;
+//           }
+
+//           productsCreated++;
+//           successCount++;
+//           currentProduct = product;
+//           currentProductId = product.id;
+//         } 
+//       }catch (err: any) {
+//       console.error("Import error:", err);
+//       setError(err.message || "Failed to import products");
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+// }
+const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+
+  setLoading(true);
+  setError("");
+  setResults(null);
+
+  try {
     const data = await file.arrayBuffer();
     const workbook = XLSX.read(data);
     const worksheet = workbook.Sheets[workbook.SheetNames[0]];
 
     // Convert to JSON with headers as keys
-    const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[]
+    const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
 
     if (!jsonData.length) {
       throw new Error("File is empty or invalid");
@@ -251,16 +411,76 @@ export default function ImportProductsModal({
           successCount++;
           currentProduct = product;
           currentProductId = product.id;
-        } 
-      }catch (err: any) {
-      console.error("Import error:", err);
-      setError(err.message || "Failed to import products");
-    } finally {
-      setLoading(false);
-    }
-  };
-}
 
+        } else if (itemType === "variant" && currentProductId) {
+          // Process variant
+          const variantAttributes: any = {};
+          
+          // Extract variant attributes
+          for (let v = 1; v <= 5; v++) {
+            const attrName = rowData[`varation ${v} name`]?.toString().trim();
+            const attrValue = rowData[`varation ${v} value`]?.toString().trim();
+            if (attrName && attrValue) {
+              variantAttributes[attrName.toLowerCase()] = attrValue;
+            }
+          }
+
+          const variantUnitPrice = rowData['unit price']?.toString().trim();
+          const variantCostPrice = rowData['cost price']?.toString().trim();
+          const variantStockQty = rowData["stock quantity"]?.toString().trim();
+          const variantMinOrderQty = rowData['min order qty']?.toString().trim();
+          const variantMaxOrderQty = rowData['max order qty']?.toString().trim();
+          const variantUom = rowData['unit of measure']?.toString().trim() || "unit";
+          const variantImageUrl = findImageUrl(rowData);
+
+          const { data: variant, error: variantError } = await supabase
+  .from("product_variants")
+  .insert({
+    product_id: currentProductId,
+    sku: sku,
+    name: `${currentProduct?.name || 'Product'} - ${Object.values(variantAttributes).join(' ')}`, // Generate a name
+    variant_attributes: variantAttributes,
+    unit_price: parseFloat(variantUnitPrice) || 0,
+    cost_price: parseFloat(variantCostPrice) || 0,
+    stock_quantity: parseInt(variantStockQty) || 0,
+    min_order_quantity: parseInt(variantMinOrderQty) || 1,
+    max_order_quantity: variantMaxOrderQty ? parseInt(variantMaxOrderQty) : null,
+    unit_of_measure: variantUom,
+    image_url: variantImageUrl || null,
+    is_active: rowData['is active']?.toString().trim().toLowerCase() === "true" || true,
+  })
+  .select()
+  .single();
+
+          if (variantError) {
+            console.error("Variant insert error:", variantError);
+            failedCount++;
+            continue;
+          }
+
+          variantsCreated++;
+          successCount++;
+        }
+      } catch (err: any) {
+        console.error(`Error processing row ${i}:`, err);
+        failedCount++;
+      }
+    }
+
+    setResults({
+      success: successCount,
+      failed: failedCount,
+      products: productsCreated,
+      variants: variantsCreated,
+    });
+
+  } catch (err: any) {
+    console.error("Import error:", err);
+    setError(err.message || "Failed to import products");
+  } finally {
+    setLoading(false);
+  }
+};
   return (
     <div className="fixed inset-0 bg-blue-600/50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl max-w-md w-full">
