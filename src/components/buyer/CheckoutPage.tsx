@@ -32,6 +32,7 @@ export function CheckoutPage({ cart, onBack, onSuccess }: CheckoutPageProps) {
   const [showAddressForm, setShowAddressForm] = useState(false);
   const [loadingAddress, setLoadingAddress] = useState(true);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const [savingAddress, setSavingAddress] = useState(false);
 
   // New address form state
   const [newAddress, setNewAddress] = useState({
@@ -100,6 +101,7 @@ export function CheckoutPage({ cart, onBack, onSuccess }: CheckoutPageProps) {
       return;
     }
 
+    setSavingAddress(true);
     try {
       const addressData = {
         buyer_id: profile!.id,
@@ -115,7 +117,11 @@ export function CheckoutPage({ cart, onBack, onSuccess }: CheckoutPageProps) {
         is_default: newAddress.is_default
       };
 
-      const { error } = await supabase.from('buyer_addresses').insert(addressData);
+      const { data: newAddressData, error } = await supabase
+        .from('buyer_addresses')
+        .insert(addressData)
+        .select()
+        .single();
 
       if (error) throw error;
 
@@ -127,6 +133,15 @@ export function CheckoutPage({ cart, onBack, onSuccess }: CheckoutPageProps) {
         .order('is_default', { ascending: false });
 
       setAddresses(data || []);
+      
+      // Auto-select the new address based on its type
+      if (newAddress.address_type === 'billing' || newAddress.address_type === 'both') {
+        setSelectedBillingAddress(newAddressData);
+      }
+      if (newAddress.address_type === 'shipping' || newAddress.address_type === 'both') {
+        setSelectedShippingAddress(newAddressData);
+      }
+      
       setShowAddressForm(false);
       setNewAddress({
         full_name: '',
@@ -140,8 +155,12 @@ export function CheckoutPage({ cart, onBack, onSuccess }: CheckoutPageProps) {
         address_type: 'both',
         is_default: false
       });
+
+      alert('Address added successfully!');
     } catch (error: any) {
       alert('Failed to add address: ' + error.message);
+    } finally {
+      setSavingAddress(false);
     }
   };
 
@@ -155,10 +174,13 @@ export function CheckoutPage({ cart, onBack, onSuccess }: CheckoutPageProps) {
   };
 
   const handleProceedToPayment = () => {
-    if (!selectedBillingAddress || !selectedShippingAddress) {
+    if (!selectedShippingAddress) {
       alert('Please select both billing and shipping addresses');
       return;
     }
+    if (!selectedBillingAddress) {
+    setSelectedBillingAddress(selectedShippingAddress);
+  }
     setCurrentStep('payment');
   };
 
@@ -193,7 +215,7 @@ export function CheckoutPage({ cart, onBack, onSuccess }: CheckoutPageProps) {
         payment_method: {
           card: cardElement!,
           billing_details: {
-            name: cardName || selectedBillingAddress?.full_name || profile?.full_name,
+            name: cardName || selectedBillingAddress?.full_name || `${profile?.first_name} ${profile?.last_name}`,
             email: profile?.email,
             phone: selectedBillingAddress?.phone,
             address,
@@ -229,24 +251,25 @@ export function CheckoutPage({ cart, onBack, onSuccess }: CheckoutPageProps) {
       }
 
       // Create order
-      const { data: order, error: orderError } = await supabase
-        .from('orders')
-        .insert({
-          order_number: orderNumber,
-          buyer_id: profile!.id,
-          seller_id: profile!.seller_id,
-          status: 'pending',
-          payment_status: paymentStatus,
-          subtotal: subtotal,
-          payment_intent_id: paymentIntentId,
-          tax_amount: tax,
-          total_amount: total,
-          notes: `Payment method: ${paymentMethod}`,
-          billing_address_id: selectedBillingAddress.id,
-          shipping_address_id: selectedShippingAddress.id,
-        })
-        .select()
-        .single();
+      // Create order
+const { data: order, error: orderError } = await supabase
+  .from('orders')
+  .insert({
+    order_number: orderNumber,
+    buyer_id: profile!.id,
+    seller_id: profile!.seller_id,
+    status: 'pending',
+    payment_status: paymentStatus,
+    subtotal: subtotal,
+    payment_intent_id: paymentIntentId,
+    tax_amount: tax,
+    total_amount: total,
+    notes: `Payment method: ${paymentMethod}`,
+    billing_address_id: selectedBillingAddress?.id || selectedShippingAddress.id,
+    shipping_address_id: selectedShippingAddress.id,
+  })
+  .select()
+  .single();
 
       if (orderError) throw orderError;
 
@@ -264,19 +287,20 @@ export function CheckoutPage({ cart, onBack, onSuccess }: CheckoutPageProps) {
       if (itemsError) throw itemsError;
 
       // Update product stock
-      for (const item of cart) {
-        const { data: product } = await supabase
-          .from('products')
-          .select('stock_quantity')
-          .eq('id', item.product_id)
-          .single();
+for (const item of cart) {
+  const { data: product } = await supabase
+    .from('products')
+    .select('stock_quantity')
+    .eq('id', item.product_id)
+    .single();
 
-        if (product) {
-          await supabase
-            .from('products')
-            .update({ stock_quantity: product.stock_quantity - item.quantity })
-            .eq('id', item.product_id);
-        }
+  if (product) {
+    await supabase
+      .from('products')
+      .update({ stock_quantity: Math.max(0, product.stock_quantity - item.quantity) })
+      .eq('id', item.product_id);
+  }
+
       }
 
       alert(`Order placed successfully! Order #${orderNumber}`);
@@ -304,16 +328,19 @@ export function CheckoutPage({ cart, onBack, onSuccess }: CheckoutPageProps) {
       if (paymentMethod === 'card') {
         if (!cardNumber || !cardName || !cardExpiry || !cardCVV) {
           alert('Please fill in all card details');
+          setLoading(false);
           return;
         }
       } else if (paymentMethod === 'paypal') {
         if (!paypalEmail) {
           alert('Please enter your PayPal email');
+          setLoading(false);
           return;
         }
       } else if (paymentMethod === 'netbanking') {
         if (!bankName) {
           alert('Please select your bank');
+          setLoading(false);
           return;
         }
       }
@@ -372,6 +399,10 @@ export function CheckoutPage({ cart, onBack, onSuccess }: CheckoutPageProps) {
     );
   }
 
+  // Filter addresses by type for better UX
+  const billingAddresses = addresses.filter(addr => addr.address_type === 'billing' || addr.address_type === 'both');
+  const shippingAddresses = addresses.filter(addr => addr.address_type === 'shipping' || addr.address_type === 'both');
+
   // Address Step
   if (currentStep === 'address') {
     return (
@@ -394,7 +425,7 @@ export function CheckoutPage({ cart, onBack, onSuccess }: CheckoutPageProps) {
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
                   <MapPin className="w-5 h-5" />
-                  Billing Address
+                  Billing Address <span className="text-sm font-normal text-slate-500">(Optional)</span>
                 </h2>
                 <button
                   onClick={() => setShowAddressForm(true)}
@@ -405,13 +436,13 @@ export function CheckoutPage({ cart, onBack, onSuccess }: CheckoutPageProps) {
                 </button>
               </div>
 
-              {addresses.length === 0 ? (
+              {billingAddresses.length === 0 ? (
                 <div className="text-center py-8 text-slate-600">
-                  <p>No addresses found. Please add an address to continue.</p>
+                  <p>No billing addresses found. Please add an address to continue.</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {addresses.map((address) => (
+                  {billingAddresses.map((address) => (
                     <button
                       key={address.id}
                       onClick={() => setSelectedBillingAddress(address)}
@@ -445,7 +476,11 @@ export function CheckoutPage({ cart, onBack, onSuccess }: CheckoutPageProps) {
                   ))}
                 </div>
               )}
+              <p className="text-sm text-slate-600 mb-4">
+  If not selected, your shipping address will be used for billing.
+</p>
             </div>
+            
 
             {/* Shipping Address */}
             <div className="bg-white rounded-xl border border-slate-200 p-6">
@@ -453,9 +488,13 @@ export function CheckoutPage({ cart, onBack, onSuccess }: CheckoutPageProps) {
                 <MapPin className="w-5 h-5" />
                 Shipping Address
               </h2>
-              {addresses.length > 0 && (
+              {shippingAddresses.length === 0 ? (
+                <div className="text-center py-8 text-slate-600">
+                  <p>No shipping addresses found. Please add an address to continue.</p>
+                </div>
+              ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {addresses.map((address) => (
+                  {shippingAddresses.map((address) => (
                     <button
                       key={address.id}
                       onClick={() => setSelectedShippingAddress(address)}
@@ -506,6 +545,7 @@ export function CheckoutPage({ cart, onBack, onSuccess }: CheckoutPageProps) {
                         value={newAddress.full_name}
                         onChange={(e) => setNewAddress({ ...newAddress, full_name: e.target.value })}
                         className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        required
                       />
                     </div>
                     <div>
@@ -530,6 +570,7 @@ export function CheckoutPage({ cart, onBack, onSuccess }: CheckoutPageProps) {
                       value={newAddress.address_line1}
                       onChange={(e) => setNewAddress({ ...newAddress, address_line1: e.target.value })}
                       className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      required
                     />
                   </div>
 
@@ -555,6 +596,7 @@ export function CheckoutPage({ cart, onBack, onSuccess }: CheckoutPageProps) {
                         value={newAddress.city}
                         onChange={(e) => setNewAddress({ ...newAddress, city: e.target.value })}
                         className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        required
                       />
                     </div>
                     <div>
@@ -566,6 +608,7 @@ export function CheckoutPage({ cart, onBack, onSuccess }: CheckoutPageProps) {
                         value={newAddress.state}
                         onChange={(e) => setNewAddress({ ...newAddress, state: e.target.value })}
                         className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        required
                       />
                     </div>
                     <div>
@@ -577,6 +620,7 @@ export function CheckoutPage({ cart, onBack, onSuccess }: CheckoutPageProps) {
                         value={newAddress.postal_code}
                         onChange={(e) => setNewAddress({ ...newAddress, postal_code: e.target.value })}
                         className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        required
                       />
                     </div>
                   </div>
@@ -635,9 +679,10 @@ export function CheckoutPage({ cart, onBack, onSuccess }: CheckoutPageProps) {
                     </button>
                     <button
                       onClick={handleAddAddress}
-                      className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                      disabled={savingAddress}
+                      className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
                     >
-                      Save Address
+                      {savingAddress ? 'Saving...' : 'Save Address'}
                     </button>
                   </div>
                 </div>
@@ -646,7 +691,7 @@ export function CheckoutPage({ cart, onBack, onSuccess }: CheckoutPageProps) {
 
             <button
               onClick={handleProceedToPayment}
-              disabled={!selectedBillingAddress || !selectedShippingAddress}
+              disabled={ !selectedShippingAddress}
               className="w-full px-4 py-3 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Proceed to Payment

@@ -306,6 +306,29 @@ export default function ProductDetailPage({ productId, onBack, onAddToCart }: Pr
                 </div>
               </div>
             )}
+            <div className="border-t border-slate-200 pt-4">
+              <h3 className="font-semibold text-slate-900 mb-3">Quantity</h3>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2 border border-slate-300 rounded-lg p-1">
+                  <button
+                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                    className="p-2 hover:bg-slate-100 rounded transition"
+                  >
+                    <Minus className="w-4 h-4" />
+                  </button>
+                  <span className="px-6 py-2 font-semibold text-slate-900">{quantity}</span>
+                  <button
+                    onClick={() => setQuantity(Math.min(getCurrentStock(), quantity + 1))}
+                    className="p-2 hover:bg-slate-100 rounded transition"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </div>
+                <div className="text-sm text-slate-600">
+                  Total: <span className="font-semibold text-slate-900">${(getCurrentPrice() * quantity).toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
              <div className="border-t border-slate-200 pt-4">
               <button
                 onClick={handleAddToCart}
@@ -351,45 +374,9 @@ export default function ProductDetailPage({ productId, onBack, onAddToCart }: Pr
               </div>
             )}
 
-            <div className="border-t border-slate-200 pt-4">
-              <h3 className="font-semibold text-slate-900 mb-3">Order Details</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-slate-500">Min Order Quantity</p>
-                  <p className="font-medium text-slate-900">{product.min_order_quantity || 1} units</p>
-                </div>
-                {product.max_order_quantity && (
-                  <div>
-                    <p className="text-sm text-slate-500">Max Order Quantity</p>
-                    <p className="font-medium text-slate-900">{product.max_order_quantity} units</p>
-                  </div>
-                )}
-              </div>
-            </div>
+          
 
-            <div className="border-t border-slate-200 pt-4">
-              <h3 className="font-semibold text-slate-900 mb-3">Quantity</h3>
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2 border border-slate-300 rounded-lg p-1">
-                  <button
-                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                    className="p-2 hover:bg-slate-100 rounded transition"
-                  >
-                    <Minus className="w-4 h-4" />
-                  </button>
-                  <span className="px-6 py-2 font-semibold text-slate-900">{quantity}</span>
-                  <button
-                    onClick={() => setQuantity(Math.min(getCurrentStock(), quantity + 1))}
-                    className="p-2 hover:bg-slate-100 rounded transition"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </button>
-                </div>
-                <div className="text-sm text-slate-600">
-                  Total: <span className="font-semibold text-slate-900">${(getCurrentPrice() * quantity).toFixed(2)}</span>
-                </div>
-              </div>
-            </div>
+            
 
            
           </div>

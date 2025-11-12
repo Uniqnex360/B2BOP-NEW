@@ -399,10 +399,10 @@ export default function SellerOrderDetailPage({ orderId, onBack }: SellerOrderDe
               {billingAddress?.phone && <p>{billingAddress.phone}</p>}
               {billingAddress ? (
                 <>
-                  <p>{billingAddress.address_line1}</p>
+                  {/* <p>{billingAddress.address_line1}</p>
                   {billingAddress.address_line2 && <p>{billingAddress.address_line2}</p>}
                   <p>{billingAddress.city}, {billingAddress.state} {billingAddress.postal_code}</p>
-                  <p>{billingAddress.country || 'USA'}</p>
+                  <p>{billingAddress.country || 'USA'}</p> */}
                 </>
               ) : (
                 <p className="text-slate-400">No billing address found</p>
@@ -417,16 +417,15 @@ export default function SellerOrderDetailPage({ orderId, onBack }: SellerOrderDe
               <h3 className="font-semibold text-slate-900">Ship To:</h3>
             </div>
             <div className="text-sm text-slate-600 space-y-1">
-              {shippingAddress ? (
+              {billingAddress ? (
                 <>
                   <p className="font-medium text-slate-900">
-                    {shippingAddress.full_name || buyer?.company_name || buyer?.business_name || `${buyer?.first_name} ${buyer?.last_name}`}
+                    {billingAddress.full_name || buyer?.company_name || buyer?.business_name || `${buyer?.first_name} ${buyer?.last_name}`}
                   </p>
-                  <p>{shippingAddress.address_line1}</p>
-                  {shippingAddress.address_line2 && <p>{shippingAddress.address_line2}</p>}
-                  <p>{shippingAddress.city}, {shippingAddress.state} {shippingAddress.postal_code}</p>
-                  <p>{shippingAddress.country || 'USA'}</p>
-                  {shippingAddress.phone && <p>{shippingAddress.phone}</p>}
+                 <p>{billingAddress.address_line1}</p>
+                  {billingAddress.address_line2 && <p>{billingAddress.address_line2}</p>}
+                  <p>{billingAddress.city}, {billingAddress.state} {billingAddress.postal_code}</p>
+                  <p>{billingAddress.country || 'USA'}</p>
                 </>
               ) : (
                 <p className="text-slate-400">No shipping address found</p>
