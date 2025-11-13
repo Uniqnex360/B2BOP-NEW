@@ -352,7 +352,7 @@ export default function ProductDetailPage({ productId, onBack, onAddToCart }: Pr
                 <ShoppingCart className="w-5 h-5" />
                 {getCurrentStock() === 0 ? 'Out of Stock' : 'Add to Cart'}
               </button>
-              {showSuccess && (
+              {(showSuccess || true) && ( 
                 <button
                   onClick={onBack}
                   className="w-full mt-3 px-6 py-3 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition font-medium"
