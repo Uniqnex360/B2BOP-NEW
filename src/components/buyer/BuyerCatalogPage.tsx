@@ -243,11 +243,11 @@ const loadCart = async () => {
         product_id: product.id, // Main product ID
         variant_id: firstVariant.id, // First variant ID
         is_variant: true,
-        quantity: quantity,
+        quantity: quantity, // Use the passed quantity
         updated_at: new Date().toISOString()
       };
 
-      console.log('Adding first variant to cart:', cartItem);
+      console.log('Adding first variant to cart with quantity:', quantity, cartItem);
 
       const { error } = await supabase
         .from('cart')
@@ -264,11 +264,11 @@ const loadCart = async () => {
         product_id: isVariant ? product.id : product.id,
         variant_id: isVariant ? product.variant_id : null,
         is_variant: isVariant,
-        quantity: quantity,
+        quantity: quantity, // Use the passed quantity
         updated_at: new Date().toISOString()
       };
 
-      console.log('Adding to cart:', cartItem);
+      console.log('Adding to cart with quantity:', quantity, cartItem);
 
       const { error } = await supabase
         .from('cart')
@@ -397,21 +397,21 @@ const loadCart = async () => {
     );
   }
 
-  if (selectedProductId) {
-    return (
-      <ProductDetailPage
-        productId={selectedProductId}
-        onBack={() => setSelectedProductId(null)}
-        onAddToCart={(product, quantity) => {
-          addToCart(product);
-          for (let i = 1; i < quantity; i++) {
-            updateQuantity(product.id, 1);
-          }
-          // setSelectedProductId(null);
-        }}
-      />
-    );
-  }
+ if (selectedProductId) {
+  return (
+    <ProductDetailPage
+      productId={selectedProductId}
+      onBack={() => setSelectedProductId(null)}
+      onAddToCart={(product, quantity) => {
+        addToCart(product, quantity);
+        // Remove the loop that was causing issues
+        // for (let i = 1; i < quantity; i++) {
+        //   updateQuantity(product.id, 1);
+        // }
+      }}
+    />
+  );
+}
 
   if (showCheckout) {
     return (
