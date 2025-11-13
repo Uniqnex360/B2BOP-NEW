@@ -4,7 +4,6 @@ import { useAuth } from "../../contexts/AuthContext";
 import {PieChart} from './PieChart'
 import {
   DollarSign,
-  Package,
   ShoppingCart,
   TrendingUp,
   TrendingDown,
@@ -84,7 +83,7 @@ export default function SellerDashboard() {
 
       const prevStartDate = new Date(startDate);
       prevStartDate.setDate(prevStartDate.getDate() - daysAgo);
-
+      console.log('brandOrders',brandOrders)
       const { data: prevOrders } = await supabase
         .from("orders")
         .select("total_amount")

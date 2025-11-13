@@ -155,7 +155,7 @@ export default function PaymentsPage() {
 
     setFilteredPayments(filtered);
   };
-
+  console.log('payments',payments)
   const calculateStats = () => {
     const totalPaid = payments
       .filter((p) => p.payment_status === 'paid')
@@ -189,237 +189,294 @@ export default function PaymentsPage() {
   };
 
   const generateInvoicePDF = (order: any) => {
-    const invoiceWindow = window.open('', '_blank');
-    if (!invoiceWindow) return;
+  const invoiceWindow = window.open('', '_blank');
+  if (!invoiceWindow) return;
 
-    // Use seller's business info or fallback to personal info
-    const companyName = sellerProfile?.business_name || `${sellerProfile?.first_name || ''} ${sellerProfile?.last_name || ''}`.trim() || 'Your Company';
-    const companyAddress = sellerProfile?.address || 'N/A';
-    const companyCityState = sellerProfile?.city && sellerProfile?.state ? `${sellerProfile.city}, ${sellerProfile.state} ${sellerProfile.zip_code || ''}`.trim() : 'N/A';
-    const companyEmail = sellerProfile?.email || 'contact@yourcompany.com';
-    const companyPhone = sellerProfile?.phone || 'N/A';
+  // Use seller's business info or fallback to personal info
+  const companyName = sellerProfile?.business_name || `${sellerProfile?.first_name || ''} ${sellerProfile?.last_name || ''}`.trim() || 'Your Company';
+  const companyAddress = sellerProfile?.address || 'N/A';
+  const companyCityState = sellerProfile?.city && sellerProfile?.state ? `${sellerProfile.city}, ${sellerProfile.state} ${sellerProfile.zip_code || ''}`.trim() : 'N/A';
+  const companyEmail = sellerProfile?.email || 'contact@yourcompany.com';
+  const companyPhone = sellerProfile?.phone || 'N/A';
 
-    // Use billing address from buyer_addresses table
-    const billingAddress = order.billing_address;
-    
-    const invoiceHTML = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Invoice - ${order.order_number}</title>
-        <style>
-          body { 
-            font-family: Arial, sans-serif; 
-            margin: 0; 
-            padding: 20px; 
-            color: #333;
-          }
-          .invoice-container { 
-            max-width: 800px; 
-            margin: 0 auto; 
-            border: 1px solid #ddd; 
-            padding: 30px;
-          }
-          .header { 
-            display: flex; 
-            justify-content: space-between; 
-            margin-bottom: 30px;
-            border-bottom: 2px solid #333;
-            padding-bottom: 20px;
-          }
-          .company-info h1 { 
-            margin: 0; 
-            color: #1e293b;
-          }
-          .invoice-info { 
-            text-align: right;
-          }
-          .invoice-details { 
-            display: grid; 
-            grid-template-columns: 1fr 1fr; 
-            gap: 30px; 
-            margin-bottom: 30px;
-          }
-          .section { 
-            margin-bottom: 20px;
-          }
-          .section h3 { 
-            border-bottom: 1px solid #ddd; 
-            padding-bottom: 5px; 
-            margin-bottom: 10px;
-            color: #475569;
-          }
-          table { 
-            width: 100%; 
-            border-collapse: collapse; 
-            margin: 20px 0;
-          }
-          th, td { 
-            border: 1px solid #ddd; 
-            padding: 12px; 
-            text-align: left;
-          }
-          th { 
-            background-color: #f8fafc; 
-            font-weight: bold;
-          }
-          .totals { 
-            margin-top: 20px; 
-            text-align: right;
-          }
-          .total-row { 
-            display: flex; 
-            justify-content: space-between; 
-            margin: 5px 0;
-          }
-          .grand-total { 
-            font-size: 1.2em; 
-            font-weight: bold; 
-            border-top: 2px solid #333; 
-            padding-top: 10px;
-          }
-          .status-badge {
-            display: inline-block;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: bold;
-            text-transform: uppercase;
-          }
-          .status-paid { background: #dcfce7; color: #166534; }
-          .status-unpaid { background: #fef3c7; color: #92400e; }
-          .status-overdue { background: #fee2e2; color: #991b1b; }
-          .footer { 
-            margin-top: 40px; 
-            text-align: center; 
-            color: #64748b; 
-            font-size: 12px;
-            border-top: 1px solid #ddd;
-            padding-top: 20px;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="invoice-container">
-          <div class="header">
-            <div class="company-info">
-              <h1>INVOICE</h1>
-              <p><strong>${companyName}</strong></p>
-              <p>${companyEmail}</p>
-              ${companyPhone !== 'N/A' ? `<p>${companyPhone}</p>` : ''}
-            </div>
-            <div class="invoice-info">
-              <h2>${order.order_number || 'N/A'}</h2>
-              <p><strong>Invoice Date:</strong> ${new Date(order.created_at).toLocaleDateString()}</p>
-              <p><strong>Due Date:</strong> ${order.due_date ? new Date(order.due_date).toLocaleDateString() : 'N/A'}</p>
-              <span class="status-badge ${
-                order.payment_status === 'paid' ? 'status-paid' : 
-                (order.payment_status === 'unpaid' && order.due_date && new Date(order.due_date) < new Date() ? 'status-overdue' : 'status-unpaid')
-              }">
-                ${order.payment_status === 'paid' ? 'Paid' : 
-                  (order.payment_status === 'unpaid' && order.due_date && new Date(order.due_date) < new Date() ? 'Overdue' : order.payment_status || 'Pending')}
-              </span>
-            </div>
+  // Use billing address from buyer_addresses table
+  const billingAddress = order.billing_address;
+  
+  // Format payment date if available
+const paymentDate = order.payment_status === 'paid' 
+  ? new Date(order.created_at).toLocaleDateString()
+  : 'N/A';  
+  // Get payment method (you might need to adjust this based on your data structure)
+const paymentMethod = order.notes?.includes('Payment method:') 
+  ? order.notes.split('Payment method:')[1]?.trim()
+  : 'N/A';
+  const invoiceHTML = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Invoice - ${order.order_number}</title>
+      <style>
+        body { 
+          font-family: Arial, sans-serif; 
+          margin: 0; 
+          padding: 20px; 
+          color: #333;
+        }
+        .invoice-container { 
+          max-width: 800px; 
+          margin: 0 auto; 
+          border: 1px solid #ddd; 
+          padding: 30px;
+        }
+        .header { 
+          display: flex; 
+          justify-content: space-between; 
+          margin-bottom: 30px;
+          border-bottom: 2px solid #333;
+          padding-bottom: 20px;
+        }
+        .company-info h1 { 
+          margin: 0; 
+          color: #1e293b;
+        }
+        .invoice-info { 
+          text-align: right;
+        }
+        .invoice-details { 
+          display: grid; 
+          grid-template-columns: 1fr 1fr; 
+          gap: 30px; 
+          margin-bottom: 30px;
+        }
+        .section { 
+          margin-bottom: 20px;
+        }
+        .section h3 { 
+          border-bottom: 1px solid #ddd; 
+          padding-bottom: 5px; 
+          margin-bottom: 10px;
+          color: #475569;
+        }
+        table { 
+          width: 100%; 
+          border-collapse: collapse; 
+          margin: 20px 0;
+        }
+        th, td { 
+          border: 1px solid #ddd; 
+          padding: 12px; 
+          text-align: left;
+        }
+        th { 
+          background-color: #f8fafc; 
+          font-weight: bold;
+        }
+        .totals { 
+          margin-top: 20px; 
+          text-align: right;
+        }
+        .total-row { 
+          display: flex; 
+          justify-content: space-between; 
+          margin: 5px 0;
+        }
+        .grand-total { 
+          font-size: 1.2em; 
+          font-weight: bold; 
+          border-top: 2px solid #333; 
+          padding-top: 10px;
+        }
+        .status-badge {
+          display: inline-block;
+          padding: 4px 12px;
+          border-radius: 20px;
+          font-size: 12px;
+          font-weight: bold;
+          text-transform: uppercase;
+        }
+        .status-paid { background: #dcfce7; color: #166534; }
+        .status-unpaid { background: #fef3c7; color: #92400e; }
+        .status-overdue { background: #fee2e2; color: #991b1b; }
+        .footer { 
+          margin-top: 40px; 
+          text-align: center; 
+          color: #64748b; 
+          font-size: 12px;
+          border-top: 1px solid #ddd;
+          padding-top: 20px;
+        }
+        .payment-info {
+          background: #f8fafc;
+          padding: 15px;
+          border-radius: 8px;
+          margin: 20px 0;
+        }
+        .payment-info-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 15px;
+        }
+        .payment-info-item {
+          display: flex;
+          flex-direction: column;
+        }
+        .payment-info-label {
+          font-size: 12px;
+          color: #64748b;
+          margin-bottom: 4px;
+        }
+        .payment-info-value {
+          font-weight: 600;
+          color: #1e293b;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="invoice-container">
+        <div class="header">
+          <div class="company-info">
+            <h1>INVOICE</h1>
+            <p><strong>${companyName}</strong></p>
+            <p>${companyEmail}</p>
+            ${companyPhone !== 'N/A' ? `<p>${companyPhone}</p>` : ''}
           </div>
-
-          <div class="invoice-details">
-            <div class="section">
-              <h3>Bill From</h3>
-              <p><strong>${companyName}</strong></p>
-              <p>${companyEmail}</p>
-              ${companyPhone !== 'N/A' ? `<p>${companyPhone}</p>` : ''}
-            </div>
-            <div class="section">
-              <h3>Bill To</h3>
-              ${billingAddress ? `
-                <p><strong>${billingAddress.full_name || order.buyer?.business_name || `${order.buyer?.first_name || ''} ${order.buyer?.last_name || ''}`.trim() || 'Customer'}</strong></p>
-                <p>${order.buyer?.email || 'N/A'}</p>
-                ${billingAddress.phone ? `<p>${billingAddress.phone}</p>` : ''}
-                <p>${billingAddress.street_address || billingAddress.address_line1 || 'N/A'}</p>
-                ${billingAddress.address_line2 ? `<p>${billingAddress.address_line2}</p>` : ''}
-                <p>${billingAddress.city || ''}, ${billingAddress.state || ''} ${billingAddress.postal_code || ''}</p>
-                <p>${billingAddress.country || 'USA'}</p>
-              ` : `
-                <p><strong>${order.buyer?.business_name || `${order.buyer?.first_name || ''} ${order.buyer?.last_name || ''}`.trim() || 'Customer'}</strong></p>
-                <p>${order.buyer?.email || 'N/A'}</p>
-                ${order.buyer?.phone ? `<p>${order.buyer.phone}</p>` : ''}
-                <p class="text-slate-400">No billing address on file</p>
-              `}
-            </div>
-          </div>
-
-          <div class="section">
-            <h3>Items</h3>
-            <table>
-              <thead>
-                <tr>
-                  <th>Item</th>
-                  <th>SKU</th>
-                  <th>Quantity</th>
-                  <th>Unit Price</th>
-                  <th>Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${order.order_items?.map((item: any) => `
-                  <tr>
-                    <td>${item.product?.name || 'Product'}</td>
-                    <td>${item.product?.sku || 'N/A'}</td>
-                    <td>${item.quantity || 0}</td>
-                    <td>$${(item.unit_price || 0).toFixed(2)}</td>
-                    <td>$${((item.quantity || 0) * (item.unit_price || 0)).toFixed(2)}</td>
-                  </tr>
-                `).join('') || '<tr><td colspan="5">No items</td></tr>'}
-              </tbody>
-            </table>
-          </div>
-
-          <div class="totals">
-            <div class="total-row">
-              <span>Subtotal:</span>
-              <span>$${(order.subtotal || 0).toFixed(2)}</span>
-            </div>
-            ${order.tax_amount ? `
-            <div class="total-row">
-              <span>Tax:</span>
-              <span>$${(order.tax_amount || 0).toFixed(2)}</span>
-            </div>
-            ` : ''}
-            ${order.shipping_amount ? `
-            <div class="total-row">
-              <span>Shipping:</span>
-              <span>$${(order.shipping_amount || 0).toFixed(2)}</span>
-            </div>
-            ` : ''}
-            ${order.discount_amount ? `
-            <div class="total-row">
-              <span>Discount:</span>
-              <span>-$${(order.discount_amount || 0).toFixed(2)}</span>
-            </div>
-            ` : ''}
-            <div class="total-row grand-total">
-              <span>Total Amount:</span>
-              <span>$${(order.total_amount || 0).toFixed(2)}</span>
-            </div>
-          </div>
-
-          <div class="footer">
-            <p>Thank you for your business!</p>
-            <p>This is an computer-generated invoice. No signature required.</p>
-            ${sellerProfile?.business_name ? `<p><strong>${sellerProfile.business_name}</strong></p>` : ''}
+          <div class="invoice-info">
+            <h2>${order.order_number || 'N/A'}</h2>
+            <p><strong>Invoice Date:</strong> ${new Date(order.created_at).toLocaleDateString()}</p>
+            <p><strong>Due Date:</strong> ${order.due_date ? new Date(order.due_date).toLocaleDateString() : 'N/A'}</p>
+            <span class="status-badge ${
+              order.payment_status === 'paid' ? 'status-paid' : 
+              (order.payment_status === 'unpaid' && order.due_date && new Date(order.due_date) < new Date() ? 'status-overdue' : 'status-unpaid')
+            }">
+              ${order.payment_status === 'paid' ? 'Paid' : 
+                (order.payment_status === 'unpaid' && order.due_date && new Date(order.due_date) < new Date() ? 'Overdue' : order.payment_status || 'Pending')}
+            </span>
           </div>
         </div>
-      </body>
-      </html>
-    `;
 
-    invoiceWindow.document.write(invoiceHTML);
-    invoiceWindow.document.close();
+        <div class="invoice-details">
+          <div class="section">
+            <h3>Bill From</h3>
+            <p><strong>${companyName}</strong></p>
+            <p>${companyEmail}</p>
+            ${companyPhone !== 'N/A' ? `<p>${companyPhone}</p>` : ''}
+          </div>
+          <div class="section">
+            <h3>Bill To</h3>
+            ${billingAddress ? `
+              <p><strong>${billingAddress.full_name || order.buyer?.business_name || `${order.buyer?.first_name || ''} ${order.buyer?.last_name || ''}`.trim() || 'Customer'}</strong></p>
+              <p>${order.buyer?.email || 'N/A'}</p>
+              ${billingAddress.phone ? `<p>${billingAddress.phone}</p>` : ''}
+              <p>${billingAddress.street_address || billingAddress.address_line1 || 'N/A'}</p>
+              ${billingAddress.address_line2 ? `<p>${billingAddress.address_line2}</p>` : ''}
+              <p>${billingAddress.city || ''}, ${billingAddress.state || ''} ${billingAddress.postal_code || ''}</p>
+              <p>${billingAddress.country || 'USA'}</p>
+            ` : `
+              <p><strong>${order.buyer?.business_name || `${order.buyer?.first_name || ''} ${order.buyer?.last_name || ''}`.trim() || 'Customer'}</strong></p>
+              <p>${order.buyer?.email || 'N/A'}</p>
+              ${order.buyer?.phone ? `<p>${order.buyer.phone}</p>` : ''}
+              <p class="text-slate-400">No billing address on file</p>
+            `}
+          </div>
+        </div>
 
-    setTimeout(() => {
-      invoiceWindow.print();
-    }, 500);
-  };
+        <!-- Payment Information -->
+        ${order.payment_status === 'paid' ? `
+          <div class="payment-info">
+            <h3 style="margin: 0 0 15px 0; color: #475569;">Payment Information</h3>
+            <div class="payment-info-grid">
+              <div class="payment-info-item">
+                <span class="payment-info-label">Payment Status</span>
+                <span class="payment-info-value">Paid</span>
+              </div>
+              <div class="payment-info-item">
+                <span class="payment-info-label">Payment Date</span>
+                <span class="payment-info-value">${paymentDate}</span>
+              </div>
+              <div class="payment-info-item">
+                <span class="payment-info-label">Payment Method</span>
+                <span class="payment-info-value">${paymentMethod}</span>
+              </div>
+              <div class="payment-info-item">
+                <span class="payment-info-label">Amount Paid</span>
+                <span class="payment-info-value">$${(order.total_amount || 0).toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
+        ` : ''}
+
+        <div class="section">
+          <h3>Items</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>SKU</th>
+                <th>Quantity</th>
+                <th>Unit Price</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${order.order_items?.map((item: any) => `
+                <tr>
+                  <td>${item.product?.name || 'Product'}</td>
+                  <td>${item.product?.sku || 'N/A'}</td>
+                  <td>${item.quantity || 0}</td>
+                  <td>$${(item.unit_price || 0).toFixed(2)}</td>
+                  <td>$${((item.quantity || 0) * (item.unit_price || 0)).toFixed(2)}</td>
+                </tr>
+              `).join('') || '<tr><td colspan="5">No items</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="totals">
+          <div class="total-row">
+            <span>Subtotal:</span>
+            <span>$${(order.subtotal || 0).toFixed(2)}</span>
+          </div>
+          ${order.tax_amount ? `
+          <div class="total-row">
+            <span>Tax:</span>
+            <span>$${(order.tax_amount || 0).toFixed(2)}</span>
+          </div>
+          ` : ''}
+          ${order.shipping_amount ? `
+          <div class="total-row">
+            <span>Shipping:</span>
+            <span>$${(order.shipping_amount || 0).toFixed(2)}</span>
+          </div>
+          ` : ''}
+          ${order.discount_amount ? `
+          <div class="total-row">
+            <span>Discount:</span>
+            <span>-$${(order.discount_amount || 0).toFixed(2)}</span>
+          </div>
+          ` : ''}
+          <div class="total-row grand-total">
+            <span>Total Amount:</span>
+            <span>$${(order.total_amount || 0).toFixed(2)}</span>
+          </div>
+        </div>
+
+        <div class="footer">
+          <p>Thank you for your business!</p>
+          <p>This is an computer-generated invoice. No signature required.</p>
+          ${sellerProfile?.business_name ? `<p><strong>${sellerProfile.business_name}</strong></p>` : ''}
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  invoiceWindow.document.write(invoiceHTML);
+  invoiceWindow.document.close();
+
+  setTimeout(() => {
+    invoiceWindow.print();
+  }, 500);
+};
 
   const handleDownloadInvoice = (order: any) => {
     generateInvoicePDF(order);

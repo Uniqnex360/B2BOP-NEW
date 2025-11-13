@@ -189,58 +189,87 @@ export default function BuyerOrderDetailPage({ orderId, onBack, onNavigate }: Bu
         </div>
 
         {/* Addresses */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          {/* Bill To */}
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <CreditCard className="w-5 h-5 text-blue-600" />
-              <h3 className="font-semibold text-slate-900">Bill To:</h3>
-            </div>
-            <div className="text-sm text-slate-600 space-y-1">
-              {billingAddress ? (
-                <>
-                  <p className="font-medium text-slate-900">
-                    {billingAddress.full_name || profile?.company_name || profile?.business_name || `${profile?.first_name} ${profile?.last_name}`}
-                  </p>
-                  <p>{profile?.email}</p>
-                  {/* 
-                  {billingAddress.phone && <p>{billingAddress.phone}</p>}
-                  <p>{billingAddress.street_address || billingAddress.address_line1}</p>
-                  {billingAddress.address_line2 && <p>{billingAddress.address_line2}</p>}
-                  <p>{billingAddress.city}, {billingAddress.state} {billingAddress.postal_code}</p>
-                  <p>{billingAddress.country || 'USA'}</p> */}
-                </>
-              ) : (
-                <p className="text-slate-400">No billing address found</p>
-              )}
-            </div>
-          </div>
+        {/* Addresses */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+  {/* Bill From */}
+  <div>
+    <div className="flex items-center gap-2 mb-3">
+      <CreditCard className="w-5 h-5 text-blue-600" />
+      <h3 className="font-semibold text-slate-900">Bill From:</h3>
+    </div>
+    <div className="text-sm text-slate-600 space-y-1">
+      {seller ? (
+        <>
+          <p className="font-medium text-slate-900">
+            {seller.company_name || seller.business_name || `${seller.first_name} ${seller.last_name}`}
+          </p>
+          <p>{seller.email}</p>
+          {seller.phone && <p>{seller.phone}</p>}
+          {seller.address && <p>{seller.address}</p>}
+          {(seller.city || seller.state || seller.zip_code) && (
+            <p>
+              {seller.city && `${seller.city}, `}
+              {seller.state} {seller.zip_code}
+            </p>
+          )}
+          {seller.country && <p>{seller.country}</p>}
+        </>
+      ) : (
+        <p className="text-slate-400">No seller information found</p>
+      )}
+    </div>
+  </div>
 
-          {/* Ship To */}
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <MapPin className="w-5 h-5 text-blue-600" />
-              <h3 className="font-semibold text-slate-900">Ship To:</h3>
-            </div>
-            <div className="text-sm text-slate-600 space-y-1">
-              {shippingAddress ? (
-                <>
-                  <p className="font-medium text-slate-900">
-                    {shippingAddress.full_name || profile?.company_name || profile?.business_name || `${profile?.first_name} ${profile?.last_name}`}
-                  </p>
-                  <p>{profile?.email}</p>
-                  {shippingAddress.phone && <p>{shippingAddress.phone}</p>}
-                  <p>{shippingAddress.street_address || shippingAddress.address_line1}</p>
-                  {shippingAddress.address_line2 && <p>{shippingAddress.address_line2}</p>}
-                  <p>{shippingAddress.city}, {shippingAddress.state} {shippingAddress.postal_code}</p>
-                  <p>{shippingAddress.country || 'USA'}</p>
-                </>
-              ) : (
-                <p className="text-slate-400">No billing address found</p>
-              )}
-            </div>
-          </div>
-        </div>
+  {/* Bill To */}
+  <div>
+    <div className="flex items-center gap-2 mb-3">
+      <MapPin className="w-5 h-5 text-blue-600" />
+      <h3 className="font-semibold text-slate-900">Bill To:</h3>
+    </div>
+    <div className="text-sm text-slate-600 space-y-1">
+      {billingAddress ? (
+        <>
+          <p className="font-medium text-slate-900">
+            {billingAddress.full_name || profile?.company_name || profile?.business_name || `${profile?.first_name} ${profile?.last_name}`}
+          </p>
+          <p>{profile?.email}</p>
+          {billingAddress.phone && <p>{billingAddress.phone}</p>}
+          <p>{billingAddress.street_address || billingAddress.address_line1}</p>
+          {billingAddress.address_line2 && <p>{billingAddress.address_line2}</p>}
+          <p>{billingAddress.city}, {billingAddress.state} {billingAddress.postal_code}</p>
+          <p>{billingAddress.country || 'USA'}</p>
+        </>
+      ) : (
+        <p className="text-slate-400">No billing address found</p>
+      )}
+    </div>
+  </div>
+
+  {/* Ship To */}
+  <div>
+    <div className="flex items-center gap-2 mb-3">
+      <MapPin className="w-5 h-5 text-blue-600" />
+      <h3 className="font-semibold text-slate-900">Ship To:</h3>
+    </div>
+    <div className="text-sm text-slate-600 space-y-1">
+      {shippingAddress ? (
+        <>
+          <p className="font-medium text-slate-900">
+            {shippingAddress.full_name || profile?.company_name || profile?.business_name || `${profile?.first_name} ${profile?.last_name}`}
+          </p>
+          <p>{profile?.email}</p>
+          {shippingAddress.phone && <p>{shippingAddress.phone}</p>}
+          <p>{shippingAddress.street_address || shippingAddress.address_line1}</p>
+          {shippingAddress.address_line2 && <p>{shippingAddress.address_line2}</p>}
+          <p>{shippingAddress.city}, {shippingAddress.state} {shippingAddress.postal_code}</p>
+          <p>{shippingAddress.country || 'USA'}</p>
+        </>
+      ) : (
+        <p className="text-slate-400">No shipping address found</p>
+      )}
+    </div>
+  </div>
+</div>
 
         {/* Order Summary */}
         <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
