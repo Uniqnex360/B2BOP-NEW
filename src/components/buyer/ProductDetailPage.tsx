@@ -86,13 +86,23 @@ export default function ProductDetailPage({ productId, onBack, onAddToCart }: Pr
   };
 
   const handleAddToCart = () => {
-    if (product && onAddToCart) {
-      const itemToAdd = selectedVariant ? { ...product, ...selectedVariant, variant_id: selectedVariant.id } : product;
-      onAddToCart(itemToAdd, quantity);
-      setShowSuccess(true);
-      setTimeout(() => setShowSuccess(false), 3000)
-    }
-  };
+  if (product && onAddToCart) {
+    const itemToAdd = selectedVariant 
+      ? { 
+          ...product, 
+          ...selectedVariant,
+          // Important: Keep the main product ID as 'id'
+          id: product.id, // Main product ID
+          variant_id: selectedVariant.id, // Variant ID in separate field
+          unit_price: selectedVariant.unit_price,
+          discount_price: selectedVariant.discount_price
+        } 
+      : product;
+    
+    onAddToCart(itemToAdd, quantity);
+    setShowSuccess(true);
+  }
+};
 
   const getCurrentPrice = () => {
     const basePrice = selectedVariant ? selectedVariant.unit_price : product?.unit_price;

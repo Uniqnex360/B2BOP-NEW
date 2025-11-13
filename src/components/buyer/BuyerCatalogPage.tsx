@@ -56,32 +56,73 @@ export default function BuyerCatalogPage() {
     }
   }, [selectedCategory, brands, products]);
 
-  const loadCart = async () => {
-    if (!profile?.id) return;
+const loadCart = async () => {
+  if (!profile?.id) return;
 
-    const { data: cartData, error } = await supabase
-      .from('cart')
-      .select(`
-        product_id,
-        quantity,
-        products (*, categories(name), brands(name))
-      `)
-      .eq('buyer_id', profile.id);
+  const { data: cartData, error } = await supabase
+    .from('cart')
+    .select(`
+      product_id,
+      variant_id,
+      is_variant,
+      quantity,
+      products (*, categories(name), brands(name)),
+      product_variants (*)
+    `)
+    .eq('buyer_id', profile.id);
 
-    if (error) {
-      console.error('Error loading cart:', error);
-      return;
-    }
+  if (error) {
+    console.error('Error loading cart:', error);
+    return;
+  }
 
-    if (cartData) {
-      const formattedCart = cartData.map(item => ({
+  if (cartData) {
+    const formattedCart = cartData.map(item => {
+      console.log('DEBUG - Cart item from DB:', {
         product_id: item.product_id,
-        quantity: item.quantity,
-        product: item.products
-      }));
-      setCart(formattedCart);
-    }
-  };
+        variant_id: item.variant_id,
+        is_variant: item.is_variant,
+        product_price: item.products?.unit_price,
+        variant_price: item.product_variants?.unit_price
+      });
+
+      // If it's a variant, merge data carefully
+      if (item.is_variant && item.product_variants) {
+        const productData = {
+          ...item.products, // Base product data
+          ...item.product_variants, // Override with variant data
+          // Ensure critical fields are preserved
+          image_url: item.product_variants.image_url || item.products.image_url,
+          name: item.product_variants.name || item.products.name,
+          // Use variant pricing
+          unit_price: item.product_variants.unit_price,
+          discount_price: item.product_variants.discount_price,
+          // Preserve category and brand info
+          categories: item.products.categories,
+          brands: item.products.brands
+        };
+        return {
+          product_id: item.product_id,
+          variant_id: item.variant_id,
+          quantity: item.quantity,
+          product: productData
+        };
+      } else {
+        // Regular product - use product data as-is
+        console.log('DEBUG - Regular product data:', item.products);
+        return {
+          product_id: item.product_id,
+          variant_id: item.variant_id,
+          quantity: item.quantity,
+          product: item.products // Use the product data directly
+        };
+      }
+    });
+    
+    console.log('DEBUG - Final cart data:', formattedCart);
+    setCart(formattedCart);
+  }
+};
 
   const loadData = async () => {
     if (!profile?.id) return;
@@ -174,51 +215,76 @@ export default function BuyerCatalogPage() {
     setFilteredProducts(filtered);
   };
 
-  const addToCart = async (product: any) => {
-    if (!profile?.id) return;
-
-    const existing = cart.find((item) => item.product_id === product.id);
+ const addToCart = async (product: any, quantity: number = 1) => {
+  try {
+    const isVariant = product.variant_id !== undefined;
     
-    if (existing) {
-      // Update quantity in database
-      const { error } = await supabase
-        .from('cart')
-        .update({ quantity: existing.quantity + 1 })
-        .eq('buyer_id', profile.id)
-        .eq('product_id', product.id);
+    // If it's a main product with variants, get the first active variant
+    if (!isVariant && product.has_variants) {
+      // Get the first active variant for this product
+      const { data: variants, error: variantError } = await supabase
+        .from('product_variants')
+        .select('*')
+        .eq('product_id', product.id)
+        .eq('is_active', true)
+        .order('unit_price', { ascending: true })
+        .limit(1);
 
-      if (error) {
-        console.error('Error updating cart:', error);
+      if (variantError || !variants || variants.length === 0) {
+        alert('No active variants available for this product');
         return;
       }
 
-      // Update local state
-      setCart(
-        cart.map((item) =>
-          item.product_id === product.id
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
-        )
-      );
-    } else {
-      // Insert new item into database
+      const firstVariant = variants[0];
+      
+      // Use the first variant instead of the main product
+      const cartItem = {
+        buyer_id: profile.id,
+        product_id: product.id, // Main product ID
+        variant_id: firstVariant.id, // First variant ID
+        is_variant: true,
+        quantity: quantity,
+        updated_at: new Date().toISOString()
+      };
+
+      console.log('Adding first variant to cart:', cartItem);
+
       const { error } = await supabase
         .from('cart')
-        .insert({
-          buyer_id: profile.id,
-          product_id: product.id,
-          quantity: 1
+        .upsert(cartItem, {
+          onConflict: 'buyer_id,product_id,variant_id'
         });
 
-      if (error) {
-        console.error('Error adding to cart:', error);
-        return;
-      }
+      if (error) throw error;
+      
+    } else {
+      // Regular product or already a variant
+      const cartItem = {
+        buyer_id: profile.id,
+        product_id: isVariant ? product.id : product.id,
+        variant_id: isVariant ? product.variant_id : null,
+        is_variant: isVariant,
+        quantity: quantity,
+        updated_at: new Date().toISOString()
+      };
 
-      // Update local state
-      setCart([...cart, { product_id: product.id, quantity: 1, product }]);
+      console.log('Adding to cart:', cartItem);
+
+      const { error } = await supabase
+        .from('cart')
+        .upsert(cartItem, {
+          onConflict: 'buyer_id,product_id,variant_id'
+        });
+
+      if (error) throw error;
     }
-  };
+    
+    await loadCart();
+  } catch (error) {
+    console.error('Error adding to cart:', error);
+    alert('Failed to add product to cart');
+  }
+};
 
   const updateQuantity = async (productId: string, delta: number) => {
     if (!profile?.id) return;

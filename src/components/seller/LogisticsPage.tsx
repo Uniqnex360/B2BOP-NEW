@@ -128,7 +128,7 @@ export default function LogisticsPage() {
         return <Clock className="w-4 h-4" />;
     }
   };
-
+  console.log("SHIPMENTS",shipments)
   const getFulfillmentStatus = (shipment: any) => {
     if (!shipment.orders || !shipment.items) return 'Unknown';
 

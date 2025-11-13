@@ -12,10 +12,9 @@ export default function PromotionDetailPage({ promotionId, onBack }: PromotionDe
   const [promotion, setPromotion] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [targetProduct, setTargetProduct] = useState<any>(null);
-  const [targetBuyer, setTargetBuyer] = useState<any>(null);
-  const [targetCategory, setTargetCategory] = useState<any>(null);
-  const [targetBrand, setTargetBrand] = useState<any>(null);
+  const [targetProducts, setTargetProducts] = useState<any[]>([]);
+  const [targetCategories, setTargetCategories] = useState<any[]>([]);
+  const [targetBrands, setTargetBrands] = useState<any[]>([]);
 
   useEffect(() => {
     loadPromotion();
@@ -43,39 +42,69 @@ export default function PromotionDetailPage({ promotionId, onBack }: PromotionDe
       console.log('Promotion data loaded:', promotionData);
       setPromotion(promotionData);
 
-      // Load related data if IDs exist
+      // Load related data for multiple selections
       const promises = [];
 
-      if (promotionData.category_id) {
+      // Load categories (both single and multiple)
+      if (promotionData.category_ids && promotionData.category_ids.length > 0) {
         promises.push(
           supabase
             .from('categories')
-            .select('name')
+            .select('id, name')
+            .in('id', promotionData.category_ids)
+            .then(({ data }) => setTargetCategories(data || []))
+        );
+      } else if (promotionData.category_id) {
+        // Fallback to single category for backward compatibility
+        promises.push(
+          supabase
+            .from('categories')
+            .select('id, name')
             .eq('id', promotionData.category_id)
             .single()
-            .then(({ data }) => setTargetCategory(data))
+            .then(({ data }) => setTargetCategories(data ? [data] : []))
         );
       }
 
-      if (promotionData.brand_id) {
+      // Load brands (both single and multiple)
+      if (promotionData.brand_ids && promotionData.brand_ids.length > 0) {
         promises.push(
           supabase
             .from('brands')
-            .select('name')
+            .select('id, name')
+            .in('id', promotionData.brand_ids)
+            .then(({ data }) => setTargetBrands(data || []))
+        );
+      } else if (promotionData.brand_id) {
+        // Fallback to single brand for backward compatibility
+        promises.push(
+          supabase
+            .from('brands')
+            .select('id, name')
             .eq('id', promotionData.brand_id)
             .single()
-            .then(({ data }) => setTargetBrand(data))
+            .then(({ data }) => setTargetBrands(data ? [data] : []))
         );
       }
 
-      if (promotionData.product_id) {
+      // Load products (both single and multiple)
+      if (promotionData.product_ids && promotionData.product_ids.length > 0) {
         promises.push(
           supabase
             .from('products')
-            .select('name, sku')
+            .select('id, name, sku')
+            .in('id', promotionData.product_ids)
+            .then(({ data }) => setTargetProducts(data || []))
+        );
+      } else if (promotionData.product_id) {
+        // Fallback to single product for backward compatibility
+        promises.push(
+          supabase
+            .from('products')
+            .select('id, name, sku')
             .eq('id', promotionData.product_id)
             .single()
-            .then(({ data }) => setTargetProduct(data))
+            .then(({ data }) => setTargetProducts(data ? [data] : []))
         );
       }
 
@@ -90,56 +119,91 @@ export default function PromotionDetailPage({ promotionId, onBack }: PromotionDe
   };
 
   const handleCloseOffer = async () => {
-    if (!confirm('Are you sure you want to close this promotion? This will deactivate it immediately.')) return;
+  if (!confirm('Are you sure you want to close this promotion? This will deactivate it immediately and remove discounts from all products.')) return;
 
-    try {
-      const { error } = await supabase
-        .from('promotions')
-        .update({ is_active: false })
-        .eq('id', promotionId);
+  try {
+    // First remove the promotion from all products
+    const { error: removeError } = await supabase
+      .from('products')
+      .update({ 
+        promotion_id: null,
+        discount_price: null
+      })
+      .eq('promotion_id', promotionId);
 
-      if (error) throw error;
+    if (removeError) throw removeError;
 
-      loadPromotion();
-    } catch (error) {
-      console.error('Error closing promotion:', error);
-      alert('Failed to close promotion');
-    }
-  };
+    // Then deactivate the promotion
+    const { error: updateError } = await supabase
+      .from('promotions')
+      .update({ is_active: false })
+      .eq('id', promotionId);
 
-  const getApplyToLabel = () => {
-  if (!promotion) return 'Loading...';
+    if (updateError) throw updateError;
 
-  switch (promotion.applies_to) {
-    case 'all':
-      return 'All Products';
-    case 'category':
-      return `Category: ${targetCategory?.name || promotion.category_id || 'N/A'}`;
-    case 'brand':
-      return `Brand: ${targetBrand?.name || promotion.brand_id || 'N/A'}`;
-    case 'product':
-      return `Product: ${targetProduct?.name || promotion.product_id || 'N/A'} (${targetProduct?.sku || 'N/A'})`;
-    case 'specific': // Add this case
-      // Check what specific target exists
-      if (promotion.product_id) {
-        return `Product: ${targetProduct?.name || promotion.product_id || 'N/A'} (${targetProduct?.sku || 'N/A'})`;
-      } else if (promotion.category_id) {
-        return `Category: ${targetCategory?.name || promotion.category_id || 'N/A'}`;
-      } else if (promotion.brand_id) {
-        return `Brand: ${targetBrand?.name || promotion.brand_id || 'N/A'}`;
-      } else {
-        return 'Specific Products (No target specified)';
-      }
-    default:
-      return 'All Products';
+    console.log('Promotion closed and removed from products');
+    loadPromotion();
+  } catch (error) {
+    console.error('Error closing promotion:', error);
+    alert('Failed to close promotion');
   }
 };
 
-  // For your data structure, buyer selection might not exist, so we'll handle it gracefully
+  const getApplyToLabel = () => {
+    if (!promotion) return 'Loading...';
+
+    // Check if we have multiple conditions
+    const hasMultipleCategories = targetCategories.length > 1;
+    const hasMultipleBrands = targetBrands.length > 1;
+    const hasMultipleProducts = targetProducts.length > 1;
+    
+    const hasCategories = targetCategories.length > 0;
+    const hasBrands = targetBrands.length > 0;
+    const hasProducts = targetProducts.length > 0;
+
+    // Count total conditions
+    const totalConditions = (hasCategories ? 1 : 0) + (hasBrands ? 1 : 0) + (hasProducts ? 1 : 0);
+
+    if (promotion.applies_to === 'all') {
+      return 'All Products';
+    }
+
+    if (totalConditions === 0) {
+      return 'No specific targets selected';
+    }
+
+    // Build description based on multiple conditions
+    const parts = [];
+
+    if (hasCategories) {
+      if (hasMultipleCategories) {
+        parts.push(`${targetCategories.length} Categories`);
+      } else {
+        parts.push(`Category: ${targetCategories[0]?.name}`);
+      }
+    }
+
+    if (hasBrands) {
+      if (hasMultipleBrands) {
+        parts.push(`${targetBrands.length} Brands`);
+      } else {
+        parts.push(`Brand: ${targetBrands[0]?.name}`);
+      }
+    }
+
+    if (hasProducts) {
+      if (hasMultipleProducts) {
+        parts.push(`${targetProducts.length} Products`);
+      } else {
+        parts.push(`Product: ${targetProducts[0]?.name}`);
+      }
+    }
+
+    return parts.join(' + ');
+  };
+
   const getBuyerSelectionLabel = () => {
     if (!promotion) return 'Loading...';
-    
-    // If your promotions table doesn't have buyer_selection field, default to 'All Buyers'
     return 'All Buyers';
   };
 
@@ -154,27 +218,71 @@ export default function PromotionDetailPage({ promotionId, onBack }: PromotionDe
       : `$${parseFloat(promotion.discount_value).toFixed(2)}`;
   };
 
-  const getStatusDetails = () => {
-    if (!promotion) return null;
+ const getStatusDetails = () => {
+  if (!promotion) return null;
 
-    const now = new Date();
-    const startDate = new Date(promotion.start_date);
-    const endDate = promotion.end_date ? new Date(promotion.end_date) : null;
+  const now = new Date();
+  const startDate = new Date(promotion.start_date);
+  const endDate = promotion.end_date ? new Date(promotion.end_date) : null;
 
-    if (!promotion.is_active) {
-      return { status: 'Inactive', color: 'red', description: 'Promotion is not active' };
+  // First check if promotion is manually deactivated
+  if (!promotion.is_active) {
+    return { status: 'Inactive', color: 'red', description: 'Promotion is manually deactivated' };
+  }
+
+  // Check if promotion hasn't started yet
+  if (now < startDate) {
+    return { status: 'Scheduled', color: 'blue', description: 'Promotion will start in the future' };
+  }
+
+  // Check if promotion has expired
+  if (endDate && now > endDate) {
+    return { status: 'Expired', color: 'orange', description: 'Promotion has ended' };
+  }
+const cleanupExpiredPromotions = async () => {
+  try {
+    const now = new Date().toISOString();
+    
+    // Find all expired promotions that are still marked as active
+    const { data: expiredPromotions, error: findError } = await supabase
+      .from('promotions')
+      .select('id')
+      .eq('is_active', true)
+      .lt('end_date', now);
+
+    if (findError) throw findError;
+
+    if (expiredPromotions && expiredPromotions.length > 0) {
+      const promotionIds = expiredPromotions.map(p => p.id);
+      
+      // Remove promotion from products
+      const { error: updateError } = await supabase
+        .from('products')
+        .update({ 
+          promotion_id: null,
+          discount_price: null
+        })
+        .in('promotion_id', promotionIds);
+
+      if (updateError) throw updateError;
+
+      // Mark promotions as inactive
+      const { error: deactivateError } = await supabase
+        .from('promotions')
+        .update({ is_active: false })
+        .in('id', promotionIds);
+
+      if (deactivateError) throw deactivateError;
+
+      console.log(`Cleaned up ${expiredPromotions.length} expired promotions`);
     }
-
-    if (now < startDate) {
-      return { status: 'Scheduled', color: 'blue', description: 'Promotion will start in the future' };
-    }
-
-    if (endDate && now > endDate) {
-      return { status: 'Expired', color: 'orange', description: 'Promotion has ended' };
-    }
-
-    return { status: 'Active', color: 'green', description: 'Promotion is currently running' };
-  };
+  } catch (error) {
+    console.error('Error cleaning up expired promotions:', error);
+  }
+};
+  // If all checks pass, promotion is active
+  return { status: 'Active', color: 'green', description: 'Promotion is currently running' };
+};
 
   const statusInfo = promotion ? getStatusDetails() : null;
 
@@ -325,6 +433,53 @@ export default function PromotionDetailPage({ promotionId, onBack }: PromotionDe
                 <Package className="w-4 h-4" />
                 {getApplyToLabel()}
               </p>
+              
+              {/* Show detailed breakdown of multiple selections */}
+              {(targetCategories.length > 0 || targetBrands.length > 0 || targetProducts.length > 0) && (
+                <div className="mt-3 space-y-2">
+                  {/* Categories */}
+                  {targetCategories.length > 0 && (
+                    <div>
+                      <p className="text-sm font-medium text-slate-700 mb-1">Categories ({targetCategories.length})</p>
+                      <div className="flex flex-wrap gap-1">
+                        {targetCategories.map((category) => (
+                          <span key={category.id} className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+                            {category.name}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Brands */}
+                  {targetBrands.length > 0 && (
+                    <div>
+                      <p className="text-sm font-medium text-slate-700 mb-1">Brands ({targetBrands.length})</p>
+                      <div className="flex flex-wrap gap-1">
+                        {targetBrands.map((brand) => (
+                          <span key={brand.id} className="inline-flex items-center px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
+                            {brand.name}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Products */}
+                  {targetProducts.length > 0 && (
+                    <div>
+                      <p className="text-sm font-medium text-slate-700 mb-1">Products ({targetProducts.length})</p>
+                      <div className="flex flex-wrap gap-1">
+                        {targetProducts.map((product) => (
+                          <span key={product.id} className="inline-flex items-center px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full">
+                            {product.name} ({product.sku})
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Buyer Selection</label>
@@ -371,7 +526,6 @@ export default function PromotionDetailPage({ promotionId, onBack }: PromotionDe
           </div>
         </div>
       </div>
-
 
       {showEditModal && (
         <PromotionModal

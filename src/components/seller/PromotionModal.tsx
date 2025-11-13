@@ -1,7 +1,7 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { X } from 'lucide-react';
+import { X, Plus, Trash2 } from 'lucide-react';
 
 interface PromotionModalProps {
   promotion?: any;
@@ -28,12 +28,37 @@ export default function PromotionModal({ promotion, onClose, onSuccess }: Promot
     is_active: promotion?.is_active ?? true,
   });
 
+  // New state for multiple selections
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
+  const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
+  const [selectedConditions, setSelectedConditions] = useState<string[]>(['category']); // Default to category
+
   // Track if this is an edit operation
   const isEdit = !!promotion;
 
   useEffect(() => {
     loadData();
+    // Initialize from existing promotion if editing
+    if (promotion) {
+      initializeFromPromotion();
+    }
   }, []);
+
+  const initializeFromPromotion = () => {
+    if (promotion.category_id) {
+      setSelectedCategories([promotion.category_id]);
+      setSelectedConditions(['category']);
+    }
+    if (promotion.brand_id) {
+      setSelectedBrands([promotion.brand_id]);
+      setSelectedConditions(['brand']);
+    }
+    if (promotion.product_id) {
+      setSelectedProducts([promotion.product_id]);
+      setSelectedConditions(['product']);
+    }
+  };
 
   const loadData = async () => {
     const [catRes, brandRes, prodRes] = await Promise.all([
@@ -45,6 +70,46 @@ export default function PromotionModal({ promotion, onClose, onSuccess }: Promot
     setCategories(catRes.data || []);
     setBrands(brandRes.data || []);
     setProducts(prodRes.data || []);
+  };
+
+  const handleConditionToggle = (condition: string) => {
+    setSelectedConditions(prev => {
+      if (prev.includes(condition)) {
+        return prev.filter(c => c !== condition);
+      } else {
+        return [...prev, condition];
+      }
+    });
+  };
+
+  const handleCategoryToggle = (categoryId: string) => {
+    setSelectedCategories(prev => {
+      if (prev.includes(categoryId)) {
+        return prev.filter(id => id !== categoryId);
+      } else {
+        return [...prev, categoryId];
+      }
+    });
+  };
+
+  const handleBrandToggle = (brandId: string) => {
+    setSelectedBrands(prev => {
+      if (prev.includes(brandId)) {
+        return prev.filter(id => id !== brandId);
+      } else {
+        return [...prev, brandId];
+      }
+    });
+  };
+
+  const handleProductToggle = (productId: string) => {
+    setSelectedProducts(prev => {
+      if (prev.includes(productId)) {
+        return prev.filter(id => id !== productId);
+      } else {
+        return [...prev, productId];
+      }
+    });
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -62,20 +127,21 @@ export default function PromotionModal({ promotion, onClose, onSuccess }: Promot
         start_date: new Date(formData.start_date).toISOString(),
         end_date: new Date(formData.end_date).toISOString(),
         is_active: formData.is_active,
-        category_id: null,
-        brand_id: null,
-        product_id: null,
+        category_ids: selectedCategories.length > 0 ? selectedCategories : null,
+        brand_ids: selectedBrands.length > 0 ? selectedBrands : null,
+        product_ids: selectedProducts.length > 0 ? selectedProducts : null,
         coupon_code: null,
       };
 
-      if (formData.applies_to === 'specific' && formData.target_id) {
-        if (formData.target_type === 'category') {
-          data.category_id = formData.target_id;
-        } else if (formData.target_type === 'brand') {
-          data.brand_id = formData.target_id;
-        } else if (formData.target_type === 'product') {
-          data.product_id = formData.target_id;
-        }
+      // For backward compatibility, set single IDs if only one is selected
+      if (selectedCategories.length === 1) {
+        data.category_id = selectedCategories[0];
+      }
+      if (selectedBrands.length === 1) {
+        data.brand_id = selectedBrands[0];
+      }
+      if (selectedProducts.length === 1) {
+        data.product_id = selectedProducts[0];
       }
 
       let result;
@@ -127,15 +193,24 @@ export default function PromotionModal({ promotion, onClose, onSuccess }: Promot
         .select('*')
         .eq('seller_id', profile!.id);
 
-      // Apply filters based on promotion type
-      if (promotionData.applies_to === 'specific') {
-        if (promotionData.category_id) {
-          query = query.eq('category_id', promotionData.category_id);
-        } else if (promotionData.brand_id) {
-          query = query.eq('brand_id', promotionData.brand_id);
-        } else if (promotionData.product_id) {
-          query = query.eq('id', promotionData.product_id);
-        }
+      // Apply filters based on promotion type and multiple conditions
+      const conditions = [];
+      
+      if (promotionData.category_ids && promotionData.category_ids.length > 0) {
+        conditions.push(`category_id.in.(${promotionData.category_ids.join(',')})`);
+      }
+      
+      if (promotionData.brand_ids && promotionData.brand_ids.length > 0) {
+        conditions.push(`brand_id.in.(${promotionData.brand_ids.join(',')})`);
+      }
+      
+      if (promotionData.product_ids && promotionData.product_ids.length > 0) {
+        conditions.push(`id.in.(${promotionData.product_ids.join(',')})`);
+      }
+
+      // If we have multiple conditions, use OR logic (products that match any condition)
+      if (conditions.length > 0) {
+        query = query.or(conditions.join(','));
       }
 
       const { data: applicableProducts, error: fetchError } = await query;
@@ -193,9 +268,27 @@ export default function PromotionModal({ promotion, onClose, onSuccess }: Promot
     }
   };
 
+  const getSelectedCategoryNames = () => {
+    return selectedCategories.map(id => 
+      categories.find(cat => cat.id === id)?.name
+    ).filter(Boolean);
+  };
+
+  const getSelectedBrandNames = () => {
+    return selectedBrands.map(id => 
+      brands.find(brand => brand.id === id)?.name
+    ).filter(Boolean);
+  };
+
+  const getSelectedProductNames = () => {
+    return selectedProducts.map(id => 
+      products.find(prod => prod.id === id)?.name
+    ).filter(Boolean);
+  };
+
   return (
     <div className="fixed inset-0 bg-blue-600/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-6 border-b border-slate-200">
           <h2 className="text-2xl font-bold text-slate-900">
             {promotion ? 'Edit Promotion' : 'Create Promotion'}
@@ -240,54 +333,206 @@ export default function PromotionModal({ promotion, onClose, onSuccess }: Promot
               </label>
               <select
                 value={formData.applies_to}
-                onChange={(e) => setFormData({ ...formData, applies_to: e.target.value, target_id: '' })}
+                onChange={(e) => setFormData({ ...formData, applies_to: e.target.value })}
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="all">All Products</option>
                 <option value="specific">Specific Items</option>
               </select>
             </div>
-
-            {formData.applies_to === 'specific' && (
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Target Type <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={formData.target_type}
-                  onChange={(e) => setFormData({ ...formData, target_type: e.target.value, target_id: '' })}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="category">Category</option>
-                  <option value="brand">Brand</option>
-                  <option value="product">Product</option>
-                </select>
-              </div>
-            )}
           </div>
 
           {formData.applies_to === 'specific' && (
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
-                Select {formData.target_type.charAt(0).toUpperCase() + formData.target_type.slice(1)} <span className="text-red-500">*</span>
-              </label>
-              <select
-                required
-                value={formData.target_id}
-                onChange={(e) => setFormData({ ...formData, target_id: e.target.value })}
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="">Select...</option>
-                {formData.target_type === 'category' && categories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>{cat.name}</option>
-                ))}
-                {formData.target_type === 'brand' && brands.map((brand) => (
-                  <option key={brand.id} value={brand.id}>{brand.name}</option>
-                ))}
-                {formData.target_type === 'product' && products.map((prod) => (
-                  <option key={prod.id} value={prod.id}>{prod.name} ({prod.sku})</option>
-                ))}
-              </select>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-3">
+                  Apply Conditions (Select one or more)
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {['category', 'brand', 'product'].map((condition) => (
+                    <button
+                      key={condition}
+                      type="button"
+                      onClick={() => handleConditionToggle(condition)}
+                      className={`px-4 py-2 rounded-lg border transition ${
+                        selectedConditions.includes(condition)
+                          ? 'bg-blue-600 text-white border-blue-600'
+                          : 'bg-white text-slate-700 border-slate-300 hover:border-blue-500'
+                      }`}
+                    >
+                      {condition.charAt(0).toUpperCase() + condition.slice(1)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Categories Selection */}
+              {selectedConditions.includes('category') && (
+                <div className="border border-slate-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="block text-sm font-medium text-slate-700">
+                      Select Categories (Multiple)
+                    </label>
+                    <span className="text-xs text-slate-500">
+                      {selectedCategories.length} selected
+                    </span>
+                  </div>
+                  <div className="max-h-40 overflow-y-auto border border-slate-200 rounded-lg">
+                    {categories.map((category) => (
+                      <div
+                        key={category.id}
+                        className={`flex items-center gap-3 p-3 border-b border-slate-100 last:border-b-0 cursor-pointer hover:bg-slate-50 ${
+                          selectedCategories.includes(category.id) ? 'bg-blue-50' : ''
+                        }`}
+                        onClick={() => handleCategoryToggle(category.id)}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedCategories.includes(category.id)}
+                          onChange={() => {}}
+                          className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+                        />
+                        <span className="text-sm text-slate-700">{category.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                  {selectedCategories.length > 0 && (
+                    <div className="mt-3">
+                      <p className="text-xs text-slate-500 mb-2">Selected categories:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {getSelectedCategoryNames().map((name, index) => (
+                          <span
+                            key={index}
+                            className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full"
+                          >
+                            {name}
+                            <button
+                              type="button"
+                              onClick={() => handleCategoryToggle(selectedCategories[index])}
+                              className="hover:text-blue-900"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Brands Selection */}
+              {selectedConditions.includes('brand') && (
+                <div className="border border-slate-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="block text-sm font-medium text-slate-700">
+                      Select Brands (Multiple)
+                    </label>
+                    <span className="text-xs text-slate-500">
+                      {selectedBrands.length} selected
+                    </span>
+                  </div>
+                  <div className="max-h-40 overflow-y-auto border border-slate-200 rounded-lg">
+                    {brands.map((brand) => (
+                      <div
+                        key={brand.id}
+                        className={`flex items-center gap-3 p-3 border-b border-slate-100 last:border-b-0 cursor-pointer hover:bg-slate-50 ${
+                          selectedBrands.includes(brand.id) ? 'bg-blue-50' : ''
+                        }`}
+                        onClick={() => handleBrandToggle(brand.id)}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedBrands.includes(brand.id)}
+                          onChange={() => {}}
+                          className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+                        />
+                        <span className="text-sm text-slate-700">{brand.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                  {selectedBrands.length > 0 && (
+                    <div className="mt-3">
+                      <p className="text-xs text-slate-500 mb-2">Selected brands:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {getSelectedBrandNames().map((name, index) => (
+                          <span
+                            key={index}
+                            className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full"
+                          >
+                            {name}
+                            <button
+                              type="button"
+                              onClick={() => handleBrandToggle(selectedBrands[index])}
+                              className="hover:text-green-900"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Products Selection */}
+              {selectedConditions.includes('product') && (
+                <div className="border border-slate-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="block text-sm font-medium text-slate-700">
+                      Select Products (Multiple)
+                    </label>
+                    <span className="text-xs text-slate-500">
+                      {selectedProducts.length} selected
+                    </span>
+                  </div>
+                  <div className="max-h-40 overflow-y-auto border border-slate-200 rounded-lg">
+                    {products.map((product) => (
+                      <div
+                        key={product.id}
+                        className={`flex items-center gap-3 p-3 border-b border-slate-100 last:border-b-0 cursor-pointer hover:bg-slate-50 ${
+                          selectedProducts.includes(product.id) ? 'bg-blue-50' : ''
+                        }`}
+                        onClick={() => handleProductToggle(product.id)}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedProducts.includes(product.id)}
+                          onChange={() => {}}
+                          className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+                        />
+                        <div>
+                          <span className="text-sm text-slate-700 block">{product.name}</span>
+                          <span className="text-xs text-slate-500">SKU: {product.sku}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {selectedProducts.length > 0 && (
+                    <div className="mt-3">
+                      <p className="text-xs text-slate-500 mb-2">Selected products:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {getSelectedProductNames().map((name, index) => (
+                          <span
+                            key={index}
+                            className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full"
+                          >
+                            {name}
+                            <button
+                              type="button"
+                              onClick={() => handleProductToggle(selectedProducts[index])}
+                              className="hover:text-purple-900"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -363,7 +608,6 @@ export default function PromotionModal({ promotion, onClose, onSuccess }: Promot
             </label>
           </div>
 
-
           <div className="flex gap-3 pt-4 border-t border-slate-200">
             <button
               type="button"
@@ -374,7 +618,7 @@ export default function PromotionModal({ promotion, onClose, onSuccess }: Promot
             </button>
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || (formData.applies_to === 'specific' && selectedConditions.length === 0)}
               className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
             >
               {loading ? 'Saving...' : promotion ? 'Update Promotion' : 'Create Promotion'}

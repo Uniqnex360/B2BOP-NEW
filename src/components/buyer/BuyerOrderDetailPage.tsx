@@ -91,7 +91,6 @@ export default function BuyerOrderDetailPage({ orderId, onBack, onNavigate }: Bu
     setLoading(false);
   };
 
-  console.log("ORDER", order);
   console.log("Billing Address:", billingAddress);
   console.log("Shipping Address:", shippingAddress);
 
@@ -224,17 +223,17 @@ export default function BuyerOrderDetailPage({ orderId, onBack, onNavigate }: Bu
               <h3 className="font-semibold text-slate-900">Ship To:</h3>
             </div>
             <div className="text-sm text-slate-600 space-y-1">
-              {billingAddress ? (
+              {shippingAddress ? (
                 <>
                   <p className="font-medium text-slate-900">
-                    {billingAddress.full_name || profile?.company_name || profile?.business_name || `${profile?.first_name} ${profile?.last_name}`}
+                    {shippingAddress.full_name || profile?.company_name || profile?.business_name || `${profile?.first_name} ${profile?.last_name}`}
                   </p>
                   <p>{profile?.email}</p>
-                  {billingAddress.phone && <p>{billingAddress.phone}</p>}
-                  <p>{billingAddress.street_address || billingAddress.address_line1}</p>
-                  {billingAddress.address_line2 && <p>{billingAddress.address_line2}</p>}
-                  <p>{billingAddress.city}, {billingAddress.state} {billingAddress.postal_code}</p>
-                  <p>{billingAddress.country || 'USA'}</p>
+                  {shippingAddress.phone && <p>{shippingAddress.phone}</p>}
+                  <p>{shippingAddress.street_address || shippingAddress.address_line1}</p>
+                  {shippingAddress.address_line2 && <p>{shippingAddress.address_line2}</p>}
+                  <p>{shippingAddress.city}, {shippingAddress.state} {shippingAddress.postal_code}</p>
+                  <p>{shippingAddress.country || 'USA'}</p>
                 </>
               ) : (
                 <p className="text-slate-400">No billing address found</p>

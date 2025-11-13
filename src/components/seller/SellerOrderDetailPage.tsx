@@ -427,7 +427,17 @@ export default function SellerOrderDetailPage({ orderId, onBack }: SellerOrderDe
                   <p>{billingAddress.city}, {billingAddress.state} {billingAddress.postal_code}</p>
                   <p>{billingAddress.country || 'USA'}</p>
                 </>
-              ) : (
+              ) :shippingAddress ? (
+                <>
+                  <p className="font-medium text-slate-900">
+                    {shippingAddress.full_name || buyer?.company_name || buyer?.business_name || `${buyer?.first_name} ${buyer?.last_name}`}
+                  </p>
+                 <p>{shippingAddress.address_line1}</p>
+                  {shippingAddress.address_line2 && <p>{shippingAddress.address_line2}</p>}
+                  <p>{shippingAddress.city}, {shippingAddress.state} {shippingAddress.postal_code}</p>
+                  <p>{shippingAddress.country || 'USA'}</p>
+                </>
+              ): (
                 <p className="text-slate-400">No shipping address found</p>
               )}
             </div>
