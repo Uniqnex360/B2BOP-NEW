@@ -1,31 +1,5 @@
 /*
   # Add Warehouses and Shipment Items Tables
-
-  1. New Tables
-    - `warehouses`
-      - `id` (uuid, primary key)
-      - `seller_id` (uuid, references user_profiles)
-      - `name` (text) - Warehouse name
-      - `address` (text) - Full address
-      - `city` (text)
-      - `state` (text)
-      - `zip_code` (text)
-      - `country` (text)
-      - `phone` (text)
-      - `is_active` (boolean)
-      - `created_at` (timestamptz)
-
-    - `shipment_items`
-      - `id` (uuid, primary key)
-      - `shipment_id` (uuid, references shipments)
-      - `order_item_id` (uuid, references order_items)
-      - `warehouse_id` (uuid, references warehouses)
-      - `quantity` (integer) - Quantity being shipped
-      - `created_at` (timestamptz)
-
-  2. Security
-    - Enable RLS on both tables
-    - Add policies for authenticated sellers
 */
 
 -- Create warehouses table
@@ -44,7 +18,7 @@ CREATE TABLE IF NOT EXISTS warehouses (
   updated_at timestamptz DEFAULT now()
 );
 
--- Create shipment_items table for tracking which items ship from which warehouse
+-- Create shipment_items table
 CREATE TABLE IF NOT EXISTS shipment_items (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   shipment_id uuid NOT NULL REFERENCES shipments(id) ON DELETE CASCADE,
@@ -76,28 +50,33 @@ ALTER TABLE warehouses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE shipment_items ENABLE ROW LEVEL SECURITY;
 
 -- Policies for warehouses
+DROP POLICY IF EXISTS "Sellers can view own warehouses" ON warehouses;
 CREATE POLICY "Sellers can view own warehouses"
   ON warehouses FOR SELECT
   TO authenticated
   USING (seller_id = auth.uid());
 
+DROP POLICY IF EXISTS "Sellers can create own warehouses" ON warehouses;
 CREATE POLICY "Sellers can create own warehouses"
   ON warehouses FOR INSERT
   TO authenticated
   WITH CHECK (seller_id = auth.uid());
 
+DROP POLICY IF EXISTS "Sellers can update own warehouses" ON warehouses;
 CREATE POLICY "Sellers can update own warehouses"
   ON warehouses FOR UPDATE
   TO authenticated
   USING (seller_id = auth.uid())
   WITH CHECK (seller_id = auth.uid());
 
+DROP POLICY IF EXISTS "Sellers can delete own warehouses" ON warehouses;
 CREATE POLICY "Sellers can delete own warehouses"
   ON warehouses FOR DELETE
   TO authenticated
   USING (seller_id = auth.uid());
 
 -- Policies for shipment_items
+DROP POLICY IF EXISTS "Users can view shipment items" ON shipment_items;
 CREATE POLICY "Users can view shipment items"
   ON shipment_items FOR SELECT
   TO authenticated
@@ -112,6 +91,7 @@ CREATE POLICY "Users can view shipment items"
     )
   );
 
+DROP POLICY IF EXISTS "Sellers can create shipment items" ON shipment_items;
 CREATE POLICY "Sellers can create shipment items"
   ON shipment_items FOR INSERT
   TO authenticated
@@ -123,6 +103,7 @@ CREATE POLICY "Sellers can create shipment items"
     )
   );
 
+DROP POLICY IF EXISTS "Sellers can update shipment items" ON shipment_items;
 CREATE POLICY "Sellers can update shipment items"
   ON shipment_items FOR UPDATE
   TO authenticated
