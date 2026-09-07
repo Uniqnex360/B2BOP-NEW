@@ -22,6 +22,7 @@ import ProfilePage from "./components/buyer/ProfilePage";
 import SellerProfilePage from "./components/seller/SellerProfilePage";
 import SettingsPage from "./components/seller/SettingsPage";
 import ImageExtractorDashboard from "./components/seller/OCR";
+import { KeepMounted } from "./components/KeepMounted";
 
 function AppContent() {
   const { user, profile, loading } = useAuth();
@@ -29,7 +30,6 @@ function AppContent() {
   const [isResetPassword, setIsResetPassword] = useState(false);
 
   useEffect(() => {
-    // Check if the URL contains reset-password
     const path = window.location.pathname;
     if (path.includes("reset-password")) {
       setIsResetPassword(true);
@@ -47,82 +47,89 @@ function AppContent() {
     );
   }
 
-  if (isResetPassword) {
-    return <ResetPasswordPage />;
-  }
-
-  if (!user || !profile) {
-    return <LoginPage />;
-  }
-
-  const renderPage = () => {
-    if (profile.role === "admin") {
-      switch (currentPage) {
-        case "dashboard":
-        case "sellers":
-          return <AdminDashboard />;
-        default:
-          return <AdminDashboard />;
-      }
-    }
-
-    if (profile.role === "seller") {
-      switch (currentPage) {
-        case "dashboard":
-          return <SellerDashboard />;
-        case "products":
-          return <ProductsPage />;
-        case "orders":
-          return <OrdersPage />;
-        case "buyers":
-          return <BuyersPage />;
-        case "promotions":
-          return <PromotionsPage />;
-        case "logistics":
-          return <LogisticsPage />;
-        case "payments":
-          return <PaymentsPage />;
-        case "inventory":
-          return <InventoryPage />;
-        case "messages":
-          return <MessagesPage />;
-        case "settings":
-          return <SettingsPage />;
-        case "profile":
-          return <SellerProfilePage />;
-        case "ocr":
-          return <ImageExtractorDashboard />;
-        default:
-          return <SellerDashboard />;
-      }
-    }
-
-    if (profile.role === "buyer") {
-      switch (currentPage) {
-        case "dashboard":
-          return <BuyerDashboard />;
-        case "catalog":
-        case "products":
-          return <BuyerCatalogPage />;
-        case "orders":
-          return <BuyerOrdersPage onNavigate={setCurrentPage} />;
-        case "wishlist":
-          return <WishlistPage />;
-        case "messages":
-          return <BuyerMessagesPage />;
-        case "profile":
-          return <ProfilePage />;
-        default:
-          return <BuyerDashboard />;
-      }
-    }
-
-    return null;
-  };
+  if (isResetPassword) return <ResetPasswordPage />;
+  if (!user || !profile) return <LoginPage />;
 
   return (
     <Layout currentPage={currentPage} onNavigate={setCurrentPage}>
-      {renderPage()}
+      {/* ---------------- ADMIN ROLE ---------------- */}
+      {profile.role === "admin" && (
+        <>
+          {currentPage === "dashboard" && <AdminDashboard />}
+          {/* Add extra admin pages wrapped in KeepMounted here */}
+        </>
+      )}
+
+      {/* ---------------- SELLER ROLE ---------------- */}
+      {profile.role === "seller" && (
+        <>
+          {/* Dashboard is NOT kept mounted (re-renders fresh) */}
+          {currentPage === "dashboard" && <SellerDashboard />}
+
+          {/* Kept Mounted Components */}
+          <KeepMounted activePage={currentPage} pageId="products">
+            <ProductsPage />
+          </KeepMounted>
+          <KeepMounted activePage={currentPage} pageId="orders">
+            <OrdersPage />
+          </KeepMounted>
+          <KeepMounted activePage={currentPage} pageId="buyers">
+            <BuyersPage />
+          </KeepMounted>
+          <KeepMounted activePage={currentPage} pageId="promotions">
+            <PromotionsPage />
+          </KeepMounted>
+          <KeepMounted activePage={currentPage} pageId="logistics">
+            <LogisticsPage />
+          </KeepMounted>
+          <KeepMounted activePage={currentPage} pageId="payments">
+            <PaymentsPage />
+          </KeepMounted>
+          <KeepMounted activePage={currentPage} pageId="inventory">
+            <InventoryPage />
+          </KeepMounted>
+          <KeepMounted activePage={currentPage} pageId="messages">
+            <MessagesPage />
+          </KeepMounted>
+          <KeepMounted activePage={currentPage} pageId="settings">
+            <SettingsPage />
+          </KeepMounted>
+          <KeepMounted activePage={currentPage} pageId="profile">
+            <SellerProfilePage />
+          </KeepMounted>
+          <KeepMounted activePage={currentPage} pageId="ocr">
+            <ImageExtractorDashboard />
+          </KeepMounted>
+        </>
+      )}
+
+      {/* ---------------- BUYER ROLE ---------------- */}
+      {profile.role === "buyer" && (
+        <>
+          {/* Dashboard is NOT kept mounted */}
+          {currentPage === "dashboard" && <BuyerDashboard />}
+
+          {/* Kept Mounted Components */}
+          <KeepMounted activePage={currentPage} pageId="catalog">
+            <BuyerCatalogPage />
+          </KeepMounted>
+          <KeepMounted activePage={currentPage} pageId="products">
+            <BuyerCatalogPage />
+          </KeepMounted>
+          <KeepMounted activePage={currentPage} pageId="orders">
+            <BuyerOrdersPage onNavigate={setCurrentPage} />
+          </KeepMounted>
+          <KeepMounted activePage={currentPage} pageId="wishlist">
+            <WishlistPage />
+          </KeepMounted>
+          <KeepMounted activePage={currentPage} pageId="messages">
+            <BuyerMessagesPage />
+          </KeepMounted>
+          <KeepMounted activePage={currentPage} pageId="profile">
+            <ProfilePage />
+          </KeepMounted>
+        </>
+      )}
     </Layout>
   );
 }
