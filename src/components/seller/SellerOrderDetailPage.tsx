@@ -836,13 +836,6 @@ export default function SellerOrderDetailPage({
             >
               Clear
             </button>
-            <button
-              onClick={() => setShowBulkModal(true)}
-              className="flex items-center gap-2 px-4 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition"
-            >
-              <Truck className="w-4 h-4" />
-              Bulk Fulfill
-            </button>
           </div>
         </div>
       )}
@@ -1186,14 +1179,21 @@ export default function SellerOrderDetailPage({
                         ) : (
                           <button
                             onClick={() => {
-                              setSelectedOrderItem(item);
-                              setEditingRecord(null);
-                              setShowFulfillmentModal(true);
+                              if (selectedItemIds.size >= 2) {
+                                setShowBulkModal(true);
+                              } else {
+                                setSelectedOrderItem(item);
+                                setEditingRecord(null);
+                                setShowFulfillmentModal(true);
+                              }
                             }}
                             className="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 transition"
                           >
                             <Truck className="w-3 h-3" />
-                            Fulfill ({remaining})
+
+                            {selectedItemIds.size >= 2
+                              ? `Bulk Fulfill (${selectedItemIds.size})`
+                              : `Fulfill (${remaining})`}
                           </button>
                         )}
                       </td>
@@ -1282,8 +1282,7 @@ export default function SellerOrderDetailPage({
         />
       )}
 
-      {/* Bulk Fulfillment Modal */}
-      {showBulkModal && selectedItemsList.length > 0 && (
+      {showBulkModal && selectedItemIds.size >= 2 && (
         <BulkFulfillModal
           items={selectedItemsList}
           warehouses={warehouses}
