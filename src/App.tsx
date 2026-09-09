@@ -22,7 +22,6 @@ import ProfilePage from "./components/buyer/ProfilePage";
 import SellerProfilePage from "./components/seller/SellerProfilePage";
 import SettingsPage from "./components/seller/SettingsPage";
 import ImageExtractorDashboard from "./components/seller/OCR";
-import { KeepMounted } from "./components/KeepMounted";
 
 function AppContent() {
   const { user, profile, loading } = useAuth();
@@ -56,78 +55,40 @@ function AppContent() {
       {profile.role === "admin" && (
         <>
           {currentPage === "dashboard" && <AdminDashboard />}
-          {/* Add extra admin pages wrapped in KeepMounted here */}
+          {/* Add extra admin pages here */}
         </>
       )}
 
       {/* ---------------- SELLER ROLE ---------------- */}
       {profile.role === "seller" && (
         <>
-          {/* Dashboard is NOT kept mounted (re-renders fresh) */}
           {currentPage === "dashboard" && <SellerDashboard />}
-
-          {/* Kept Mounted Components */}
-          <KeepMounted activePage={currentPage} pageId="products">
-            <ProductsPage />
-          </KeepMounted>
-          <KeepMounted activePage={currentPage} pageId="orders">
-            <OrdersPage />
-          </KeepMounted>
-          <KeepMounted activePage={currentPage} pageId="buyers">
-            <BuyersPage />
-          </KeepMounted>
-          <KeepMounted activePage={currentPage} pageId="promotions">
-            <PromotionsPage />
-          </KeepMounted>
-          <KeepMounted activePage={currentPage} pageId="logistics">
-            <LogisticsPage />
-          </KeepMounted>
-          <KeepMounted activePage={currentPage} pageId="payments">
-            <PaymentsPage />
-          </KeepMounted>
-          <KeepMounted activePage={currentPage} pageId="inventory">
-            <InventoryPage />
-          </KeepMounted>
-          <KeepMounted activePage={currentPage} pageId="messages">
-            <MessagesPage />
-          </KeepMounted>
-          <KeepMounted activePage={currentPage} pageId="settings">
-            <SettingsPage />
-          </KeepMounted>
-          <KeepMounted activePage={currentPage} pageId="profile">
-            <SellerProfilePage />
-          </KeepMounted>
-          <KeepMounted activePage={currentPage} pageId="ocr">
-            <ImageExtractorDashboard />
-          </KeepMounted>
+          {currentPage === "products" && <ProductsPage />}
+          {currentPage === "orders" && <OrdersPage />}
+          {currentPage === "buyers" && <BuyersPage />}
+          {currentPage === "promotions" && <PromotionsPage />}
+          {currentPage === "logistics" && <LogisticsPage />}
+          {currentPage === "payments" && <PaymentsPage />}
+          {currentPage === "inventory" && <InventoryPage />}
+          {currentPage === "messages" && <MessagesPage />}
+          {currentPage === "settings" && <SettingsPage />}
+          {currentPage === "profile" && <SellerProfilePage />}
+          {currentPage === "ocr" && <ImageExtractorDashboard />}
         </>
       )}
 
       {/* ---------------- BUYER ROLE ---------------- */}
       {profile.role === "buyer" && (
         <>
-          {/* Dashboard is NOT kept mounted */}
           {currentPage === "dashboard" && <BuyerDashboard />}
-
-          {/* Kept Mounted Components */}
-          <KeepMounted activePage={currentPage} pageId="catalog">
-            <BuyerCatalogPage />
-          </KeepMounted>
-          <KeepMounted activePage={currentPage} pageId="products">
-            <BuyerCatalogPage />
-          </KeepMounted>
-          <KeepMounted activePage={currentPage} pageId="orders">
+          {currentPage === "catalog" && <BuyerCatalogPage />}
+          {currentPage === "products" && <BuyerCatalogPage />}
+          {currentPage === "orders" && (
             <BuyerOrdersPage onNavigate={setCurrentPage} />
-          </KeepMounted>
-          <KeepMounted activePage={currentPage} pageId="wishlist">
-            <WishlistPage />
-          </KeepMounted>
-          <KeepMounted activePage={currentPage} pageId="messages">
-            <BuyerMessagesPage />
-          </KeepMounted>
-          <KeepMounted activePage={currentPage} pageId="profile">
-            <ProfilePage />
-          </KeepMounted>
+          )}
+          {currentPage === "wishlist" && <WishlistPage />}
+          {currentPage === "messages" && <BuyerMessagesPage />}
+          {currentPage === "profile" && <ProfilePage />}
         </>
       )}
     </Layout>
