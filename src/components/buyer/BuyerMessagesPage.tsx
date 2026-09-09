@@ -1,15 +1,17 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase';
-import { useAuth } from '../../contexts/AuthContext';
-import { MessageSquare, Send } from 'lucide-react';
+import { useState, useEffect } from "react";
+import { supabase } from "../../lib/supabase";
+import { useAuth } from "../../contexts/AuthContext";
+import { MessageSquare, Send } from "lucide-react";
 
 export default function BuyerMessagesPage() {
   const { profile } = useAuth();
+  console.log("BUYER PROFILE:", profile);
+  console.log("BUYER SELLER ID:", profile?.seller_id);
   const [conversations, setConversations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [sellerInfo, setSellerInfo] = useState<any>(null);
-  const [newMessage, setNewMessage] = useState('');
-  const [subject, setSubject] = useState('');
+  const [newMessage, setNewMessage] = useState("");
+  const [subject, setSubject] = useState("");
   const [sending, setSending] = useState(false);
 
   useEffect(() => {
@@ -18,13 +20,23 @@ export default function BuyerMessagesPage() {
   }, [profile]);
 
   const loadSellerInfo = async () => {
-    if (!profile?.seller_id) return;
+    console.log("========== SELLER DEBUG ==========");
+    console.log("PROFILE:", profile);
+    console.log("SELLER ID:", profile?.seller_id);
 
-    const { data } = await supabase
-      .from('user_profiles')
-      .select('id, email, first_name, last_name, business_name')
-      .eq('id', profile.seller_id)
+    if (!profile?.seller_id) {
+      console.log("❌ profile.seller_id is missing");
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("user_profiles")
+      .select("*")
+      .eq("id", profile.seller_id)
       .maybeSingle();
+
+    console.log("SELLER QUERY DATA:", data);
+    console.log("SELLER QUERY ERROR:", error);
 
     setSellerInfo(data);
   };
@@ -34,44 +46,52 @@ export default function BuyerMessagesPage() {
 
     setLoading(true);
     const { data } = await supabase
-      .from('messages')
-      .select('*')
+      .from("messages")
+      .select("*")
       .or(`sender_id.eq.${profile.id},recipient_id.eq.${profile.id}`)
-      .order('created_at', { ascending: false });
+      .order("created_at", { ascending: false });
 
     setConversations(data || []);
     setLoading(false);
   };
 
   const handleSendMessage = async () => {
+    console.log("PROFILE:", profile);
+    console.log("SELLER INFO:", sellerInfo);
+
     if (!newMessage.trim()) {
-      alert('Please enter a message');
+      alert("Please enter a message");
       return;
     }
 
     if (!profile?.id || !sellerInfo?.id) {
-      alert('Unable to send message. Please refresh the page.');
+      console.log("Missing:", {
+        profileId: profile?.id,
+        sellerId: sellerInfo?.id,
+      });
+
+      alert("Unable to send message. Please refresh the page.");
       return;
     }
 
     setSending(true);
     try {
-      const { error } = await supabase.from('messages').insert({
+      const { error } = await supabase.from("messages").insert({
         sender_id: profile.id,
         recipient_id: sellerInfo.id,
-        subject: subject.trim() || 'New Message',
+        subject: subject.trim() || "New Message",
         message: newMessage.trim(),
       });
 
       if (error) throw error;
 
-      setNewMessage('');
-      setSubject('');
+      setNewMessage("");
+      setSubject("");
       loadMessages();
-      alert('Message sent successfully!');
+      alert("Message sent successfully!");
     } catch (error) {
-      console.error('Error sending message:', error);
-      alert('Failed to send message');
+      console.error("Error sending message:", error);
+      alert("Failed to send message");
     } finally {
       setSending(false);
     }
@@ -96,11 +116,14 @@ export default function BuyerMessagesPage() {
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 bg-blue-600 text-white rounded-full flex items-center justify-center font-semibold">
-              {sellerInfo.first_name?.[0]}{sellerInfo.last_name?.[0]}
+              {sellerInfo.first_name?.[0]}
+              {sellerInfo.last_name?.[0]}
             </div>
             <div>
               <p className="font-semibold text-slate-900">
-                Messaging: {sellerInfo.business_name || `${sellerInfo.first_name} ${sellerInfo.last_name}`}
+                Messaging:{" "}
+                {sellerInfo.business_name ||
+                  `${sellerInfo.first_name} ${sellerInfo.last_name}`}
               </p>
               <p className="text-sm text-slate-600">{sellerInfo.email}</p>
             </div>
@@ -123,8 +146,12 @@ export default function BuyerMessagesPage() {
                   key={msg.id}
                   className="p-3 bg-slate-50 rounded-lg hover:bg-slate-100 cursor-pointer transition"
                 >
-                  <p className="font-medium text-slate-900 text-sm">{msg.subject || 'No Subject'}</p>
-                  <p className="text-xs text-slate-600 line-clamp-1">{msg.message}</p>
+                  <p className="font-medium text-slate-900 text-sm">
+                    {msg.subject || "No Subject"}
+                  </p>
+                  <p className="text-xs text-slate-600 line-clamp-1">
+                    {msg.message}
+                  </p>
                   <p className="text-xs text-slate-500 mt-1">
                     {new Date(msg.created_at).toLocaleDateString()}
                   </p>
@@ -137,7 +164,9 @@ export default function BuyerMessagesPage() {
         <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 p-6">
           <div className="flex flex-col h-[600px]">
             <div className="mb-4">
-              <h3 className="text-lg font-semibold text-slate-900 mb-4">Send Message to Seller</h3>
+              <h3 className="text-lg font-semibold text-slate-900 mb-4">
+                Send Message to Seller
+              </h3>
               <div className="space-y-3">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">
@@ -169,7 +198,7 @@ export default function BuyerMessagesPage() {
                   className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
                 >
                   <Send className="w-4 h-4" />
-                  {sending ? 'Sending...' : 'Send Message'}
+                  {sending ? "Sending..." : "Send Message"}
                 </button>
               </div>
             </div>
@@ -179,25 +208,33 @@ export default function BuyerMessagesPage() {
                 <div className="flex items-center justify-center h-full">
                   <div className="text-center">
                     <MessageSquare className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-                    <p className="text-slate-600">No conversation history yet</p>
-                    <p className="text-sm text-slate-500 mt-2">Send your first message above</p>
+                    <p className="text-slate-600">
+                      No conversation history yet
+                    </p>
+                    <p className="text-sm text-slate-500 mt-2">
+                      Send your first message above
+                    </p>
                   </div>
                 </div>
               ) : (
                 <div className="space-y-3">
-                  <h4 className="font-medium text-slate-700 mb-2">Conversation History</h4>
+                  <h4 className="font-medium text-slate-700 mb-2">
+                    Conversation History
+                  </h4>
                   {conversations.map((msg) => (
                     <div
                       key={msg.id}
                       className={`p-4 rounded-lg ${
                         msg.sender_id === profile?.id
-                          ? 'bg-blue-100 ml-8'
-                          : 'bg-white mr-8'
+                          ? "bg-blue-100 ml-8"
+                          : "bg-white mr-8"
                       }`}
                     >
                       <div className="flex items-start justify-between mb-1">
                         <p className="font-semibold text-slate-900 text-sm">
-                          {msg.sender_id === profile?.id ? 'You' : sellerInfo?.business_name || 'Seller'}
+                          {msg.sender_id === profile?.id
+                            ? "You"
+                            : sellerInfo?.business_name || "Seller"}
                         </p>
                         <p className="text-xs text-slate-500">
                           {new Date(msg.created_at).toLocaleString()}
