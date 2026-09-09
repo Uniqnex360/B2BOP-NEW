@@ -1,7 +1,7 @@
-import { useState, useEffect, FormEvent } from 'react';
-import { supabase } from '../../lib/supabase';
-import { useAuth } from '../../contexts/AuthContext';
-import { X, Plus, Trash2 } from 'lucide-react';
+import { useState, useEffect, FormEvent } from "react";
+import { supabase } from "../../lib/supabase";
+import { useAuth } from "../../contexts/AuthContext";
+import { X, Plus, Trash2 } from "lucide-react";
 
 interface PromotionModalProps {
   promotion?: any;
@@ -9,22 +9,38 @@ interface PromotionModalProps {
   onSuccess: (createdPromotion?: any) => void;
 }
 
-export default function PromotionModal({ promotion, onClose, onSuccess }: PromotionModalProps) {
+export default function PromotionModal({
+  promotion,
+  onClose,
+  onSuccess,
+}: PromotionModalProps) {
   const { profile } = useAuth();
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState<any[]>([]);
   const [brands, setBrands] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [formData, setFormData] = useState({
-    name: promotion?.name || '',
-    description: promotion?.description || '',
-    applies_to: promotion?.applies_to || 'all',
-    target_type: promotion?.category_id ? 'category' : promotion?.brand_id ? 'brand' : promotion?.product_id ? 'product' : 'category',
-    target_id: promotion?.category_id || promotion?.brand_id || promotion?.product_id || '',
-    promotion_type: promotion?.promotion_type || 'percentage',
-    discount_value: promotion?.discount_value || '',
-    start_date: promotion?.start_date ? promotion.start_date.split('T')[0] : new Date().toISOString().split('T')[0],
-    end_date: promotion?.end_date ? promotion.end_date.split('T')[0] : '',
+    name: promotion?.name || "",
+    description: promotion?.description || "",
+    applies_to: promotion?.applies_to || "all",
+    target_type: promotion?.category_id
+      ? "category"
+      : promotion?.brand_id
+        ? "brand"
+        : promotion?.product_id
+          ? "product"
+          : "category",
+    target_id:
+      promotion?.category_id ||
+      promotion?.brand_id ||
+      promotion?.product_id ||
+      "",
+    promotion_type: promotion?.promotion_type || "percentage",
+    discount_value: promotion?.discount_value || "",
+    start_date: promotion?.start_date
+      ? promotion.start_date.split("T")[0]
+      : new Date().toISOString().split("T")[0],
+    end_date: promotion?.end_date ? promotion.end_date.split("T")[0] : "",
     is_active: promotion?.is_active ?? true,
   });
 
@@ -32,7 +48,9 @@ export default function PromotionModal({ promotion, onClose, onSuccess }: Promot
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
-  const [selectedConditions, setSelectedConditions] = useState<string[]>(['category']); // Default to category
+  const [selectedConditions, setSelectedConditions] = useState<string[]>([
+    "category",
+  ]); // Default to category
 
   // Track if this is an edit operation
   const isEdit = !!promotion;
@@ -48,23 +66,35 @@ export default function PromotionModal({ promotion, onClose, onSuccess }: Promot
   const initializeFromPromotion = () => {
     if (promotion.category_id) {
       setSelectedCategories([promotion.category_id]);
-      setSelectedConditions(['category']);
+      setSelectedConditions(["category"]);
     }
     if (promotion.brand_id) {
       setSelectedBrands([promotion.brand_id]);
-      setSelectedConditions(['brand']);
+      setSelectedConditions(["brand"]);
     }
     if (promotion.product_id) {
       setSelectedProducts([promotion.product_id]);
-      setSelectedConditions(['product']);
+      setSelectedConditions(["product"]);
     }
   };
 
   const loadData = async () => {
     const [catRes, brandRes, prodRes] = await Promise.all([
-      supabase.from('categories').select('*').eq('seller_id', profile!.id).eq('is_active', true),
-      supabase.from('brands').select('*').eq('seller_id', profile!.id).eq('is_active', true),
-      supabase.from('products').select('id, name, sku').eq('seller_id', profile!.id).eq('is_active', true),
+      supabase
+        .from("categories")
+        .select("*")
+        .eq("seller_id", profile!.id)
+        .eq("is_active", true),
+      supabase
+        .from("brands")
+        .select("*")
+        .eq("seller_id", profile!.id)
+        .eq("is_active", true),
+      supabase
+        .from("products")
+        .select("id, name, sku")
+        .eq("seller_id", profile!.id)
+        .eq("is_active", true),
     ]);
 
     setCategories(catRes.data || []);
@@ -73,9 +103,9 @@ export default function PromotionModal({ promotion, onClose, onSuccess }: Promot
   };
 
   const handleConditionToggle = (condition: string) => {
-    setSelectedConditions(prev => {
+    setSelectedConditions((prev) => {
       if (prev.includes(condition)) {
-        return prev.filter(c => c !== condition);
+        return prev.filter((c) => c !== condition);
       } else {
         return [...prev, condition];
       }
@@ -83,9 +113,9 @@ export default function PromotionModal({ promotion, onClose, onSuccess }: Promot
   };
 
   const handleCategoryToggle = (categoryId: string) => {
-    setSelectedCategories(prev => {
+    setSelectedCategories((prev) => {
       if (prev.includes(categoryId)) {
-        return prev.filter(id => id !== categoryId);
+        return prev.filter((id) => id !== categoryId);
       } else {
         return [...prev, categoryId];
       }
@@ -93,9 +123,9 @@ export default function PromotionModal({ promotion, onClose, onSuccess }: Promot
   };
 
   const handleBrandToggle = (brandId: string) => {
-    setSelectedBrands(prev => {
+    setSelectedBrands((prev) => {
       if (prev.includes(brandId)) {
-        return prev.filter(id => id !== brandId);
+        return prev.filter((id) => id !== brandId);
       } else {
         return [...prev, brandId];
       }
@@ -103,9 +133,9 @@ export default function PromotionModal({ promotion, onClose, onSuccess }: Promot
   };
 
   const handleProductToggle = (productId: string) => {
-    setSelectedProducts(prev => {
+    setSelectedProducts((prev) => {
       if (prev.includes(productId)) {
-        return prev.filter(id => id !== productId);
+        return prev.filter((id) => id !== productId);
       } else {
         return [...prev, productId];
       }
@@ -148,27 +178,27 @@ export default function PromotionModal({ promotion, onClose, onSuccess }: Promot
       if (promotion) {
         // For edits, first remove the promotion from existing products
         await removePromotionFromProducts(promotion.id);
-        
+
         const { data: updateData, error } = await supabase
-          .from('promotions')
+          .from("promotions")
           .update(data)
-          .eq('id', promotion.id)
+          .eq("id", promotion.id)
           .select();
         if (error) throw error;
         result = updateData?.[0];
-        
+
         // If the promotion is active after edit, apply it to products
         if (result.is_active) {
           await applyPromotionToProducts(result);
         }
       } else {
         const { data: insertData, error } = await supabase
-          .from('promotions')
+          .from("promotions")
           .insert(data)
           .select();
         if (error) throw error;
         result = insertData?.[0];
-        
+
         // If the promotion is active, apply it to products
         if (result.is_active) {
           await applyPromotionToProducts(result);
@@ -178,7 +208,7 @@ export default function PromotionModal({ promotion, onClose, onSuccess }: Promot
       // Pass the created/updated promotion to onSuccess
       onSuccess(result);
     } catch (err: any) {
-      alert(err.message || 'Failed to save promotion');
+      alert(err.message || "Failed to save promotion");
     } finally {
       setLoading(false);
     }
@@ -187,63 +217,142 @@ export default function PromotionModal({ promotion, onClose, onSuccess }: Promot
   // Function to apply promotion to products
   const applyPromotionToProducts = async (promotionData: any) => {
     try {
-      // First, get all applicable products
+      console.log("========== APPLY PROMOTION ==========");
+      console.log("Promotion:", promotionData);
+
       let query = supabase
-        .from('products')
-        .select('*')
-        .eq('seller_id', profile!.id);
+        .from("products")
+        .select(
+          "id, name, sku, seller_id, unit_price, original_price, discount_price",
+        )
+        .eq("seller_id", profile!.id)
+        .eq("is_active", true);
 
-      // Apply filters based on promotion type and multiple conditions
-      const conditions = [];
-      
-      if (promotionData.category_ids && promotionData.category_ids.length > 0) {
-        conditions.push(`category_id.in.(${promotionData.category_ids.join(',')})`);
-      }
-      
-      if (promotionData.brand_ids && promotionData.brand_ids.length > 0) {
-        conditions.push(`brand_id.in.(${promotionData.brand_ids.join(',')})`);
-      }
-      
-      if (promotionData.product_ids && promotionData.product_ids.length > 0) {
-        conditions.push(`id.in.(${promotionData.product_ids.join(',')})`);
+      // -----------------------------------------
+      // 1. ALL PRODUCTS
+      // -----------------------------------------
+      if (promotionData.applies_to === "all") {
+        console.log("Applying promotion to ALL products");
       }
 
-      // If we have multiple conditions, use OR logic (products that match any condition)
-      if (conditions.length > 0) {
-        query = query.or(conditions.join(','));
+      // -----------------------------------------
+      // 2. SPECIFIC PRODUCTS
+      // -----------------------------------------
+      else if (promotionData.applies_to === "specific") {
+        const conditions: string[] = [];
+
+        if (
+          Array.isArray(promotionData.category_ids) &&
+          promotionData.category_ids.length > 0
+        ) {
+          conditions.push(
+            `category_id.in.(${promotionData.category_ids.join(",")})`,
+          );
+        }
+
+        if (
+          Array.isArray(promotionData.brand_ids) &&
+          promotionData.brand_ids.length > 0
+        ) {
+          conditions.push(`brand_id.in.(${promotionData.brand_ids.join(",")})`);
+        }
+
+        if (
+          Array.isArray(promotionData.product_ids) &&
+          promotionData.product_ids.length > 0
+        ) {
+          conditions.push(`id.in.(${promotionData.product_ids.join(",")})`);
+        }
+
+        if (conditions.length === 0) {
+          console.warn("Specific promotion has no selected targets");
+          return;
+        }
+
+        // Match ANY selected condition
+        query = query.or(conditions.join(","));
       }
 
+      // -----------------------------------------
+      // 3. GET PRODUCTS
+      // -----------------------------------------
       const { data: applicableProducts, error: fetchError } = await query;
-      if (fetchError) throw fetchError;
+
+      console.log("Applicable products:", applicableProducts);
+      console.log("Fetch error:", fetchError);
+
+      if (fetchError) {
+        throw fetchError;
+      }
 
       if (!applicableProducts || applicableProducts.length === 0) {
-        console.log('No products found to apply promotion to');
+        console.warn("No products found for promotion");
         return;
       }
 
-      // Update each product with the calculated discount
+      // -----------------------------------------
+      // 4. CALCULATE + UPDATE
+      // -----------------------------------------
       for (const product of applicableProducts) {
-        const updateData: any = {
-          promotion_id: promotionData.id,
-          original_price: product.original_price || product.unit_price
-        };
+        const price = Number(product.unit_price);
 
-        // Calculate discount price
-        if (promotionData.promotion_type === 'percentage') {
-          updateData.discount_price = Number((product.unit_price * (1 - promotionData.discount_value / 100)).toFixed(2));
-        } else {
-          updateData.discount_price = Number(Math.max(0, product.unit_price - promotionData.discount_value).toFixed(2));
+        if (!Number.isFinite(price) || price < 0) {
+          console.warn(
+            `Skipping ${product.name} because unit_price is invalid:`,
+            product.unit_price,
+          );
+          continue;
         }
 
-        await supabase
-          .from('products')
+        const discountValue = Number(promotionData.discount_value);
+
+        if (!Number.isFinite(discountValue) || discountValue < 0) {
+          console.warn("Invalid discount value:", promotionData.discount_value);
+          continue;
+        }
+
+        let discountPrice: number;
+
+        // Percentage discount
+        if (promotionData.promotion_type === "percentage") {
+          const percentage = Math.min(discountValue, 100);
+
+          discountPrice = price * (1 - percentage / 100);
+        }
+
+        // Fixed amount discount
+        else if (promotionData.promotion_type === "flat") {
+          discountPrice = Math.max(0, price - discountValue);
+        } else {
+          console.warn("Unknown promotion type:", promotionData.promotion_type);
+          continue;
+        }
+
+        discountPrice = Number(discountPrice.toFixed(2));
+
+        const updateData = {
+          promotion_id: promotionData.id,
+          original_price: price,
+          discount_price: discountPrice,
+        };
+
+        console.log(`Updating ${product.sku}:`, updateData);
+
+        const { error: updateError } = await supabase
+          .from("products")
           .update(updateData)
-          .eq('id', product.id);
+          .eq("id", product.id)
+          .eq("seller_id", profile!.id);
+
+        if (updateError) {
+          console.error(`Failed updating product ${product.id}:`, updateError);
+        }
       }
 
-      console.log(`Promotion applied to ${applicableProducts.length} products successfully`);
+      console.log(`Promotion applied to ${applicableProducts.length} products`);
     } catch (error) {
-      console.error('Error applying promotion to products:', error);
+      console.error("Error applying promotion to products:", error);
+
       throw error;
     }
   };
@@ -252,38 +361,38 @@ export default function PromotionModal({ promotion, onClose, onSuccess }: Promot
   const removePromotionFromProducts = async (promotionId: string) => {
     try {
       const { error } = await supabase
-        .from('products')
+        .from("products")
         .update({
           promotion_id: null,
-          discount_price: null
+          discount_price: null,
         })
-        .eq('promotion_id', promotionId);
+        .eq("promotion_id", promotionId);
 
       if (error) throw error;
-      
-      console.log('Promotion removed from products');
+
+      console.log("Promotion removed from products");
     } catch (error) {
-      console.error('Error removing promotion from products:', error);
+      console.error("Error removing promotion from products:", error);
       throw error;
     }
   };
 
   const getSelectedCategoryNames = () => {
-    return selectedCategories.map(id => 
-      categories.find(cat => cat.id === id)?.name
-    ).filter(Boolean);
+    return selectedCategories
+      .map((id) => categories.find((cat) => cat.id === id)?.name)
+      .filter(Boolean);
   };
 
   const getSelectedBrandNames = () => {
-    return selectedBrands.map(id => 
-      brands.find(brand => brand.id === id)?.name
-    ).filter(Boolean);
+    return selectedBrands
+      .map((id) => brands.find((brand) => brand.id === id)?.name)
+      .filter(Boolean);
   };
 
   const getSelectedProductNames = () => {
-    return selectedProducts.map(id => 
-      products.find(prod => prod.id === id)?.name
-    ).filter(Boolean);
+    return selectedProducts
+      .map((id) => products.find((prod) => prod.id === id)?.name)
+      .filter(Boolean);
   };
 
   return (
@@ -291,9 +400,12 @@ export default function PromotionModal({ promotion, onClose, onSuccess }: Promot
       <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-6 border-b border-slate-200">
           <h2 className="text-2xl font-bold text-slate-900">
-            {promotion ? 'Edit Promotion' : 'Create Promotion'}
+            {promotion ? "Edit Promotion" : "Create Promotion"}
           </h2>
-          <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-lg">
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-slate-100 rounded-lg"
+          >
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -307,7 +419,9 @@ export default function PromotionModal({ promotion, onClose, onSuccess }: Promot
               type="text"
               required
               value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, name: e.target.value })
+              }
               className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="e.g., Summer Sale"
             />
@@ -319,7 +433,9 @@ export default function PromotionModal({ promotion, onClose, onSuccess }: Promot
             </label>
             <textarea
               value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, description: e.target.value })
+              }
               rows={3}
               className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="Describe this promotion..."
@@ -333,7 +449,9 @@ export default function PromotionModal({ promotion, onClose, onSuccess }: Promot
               </label>
               <select
                 value={formData.applies_to}
-                onChange={(e) => setFormData({ ...formData, applies_to: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, applies_to: e.target.value })
+                }
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="all">All Products</option>
@@ -342,22 +460,22 @@ export default function PromotionModal({ promotion, onClose, onSuccess }: Promot
             </div>
           </div>
 
-          {formData.applies_to === 'specific' && (
+          {formData.applies_to === "specific" && (
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-3">
                   Apply Conditions (Select one or more)
                 </label>
                 <div className="flex flex-wrap gap-2">
-                  {['category', 'brand', 'product'].map((condition) => (
+                  {["category", "brand", "product"].map((condition) => (
                     <button
                       key={condition}
                       type="button"
                       onClick={() => handleConditionToggle(condition)}
                       className={`px-4 py-2 rounded-lg border transition ${
                         selectedConditions.includes(condition)
-                          ? 'bg-blue-600 text-white border-blue-600'
-                          : 'bg-white text-slate-700 border-slate-300 hover:border-blue-500'
+                          ? "bg-blue-600 text-white border-blue-600"
+                          : "bg-white text-slate-700 border-slate-300 hover:border-blue-500"
                       }`}
                     >
                       {condition.charAt(0).toUpperCase() + condition.slice(1)}
@@ -367,7 +485,7 @@ export default function PromotionModal({ promotion, onClose, onSuccess }: Promot
               </div>
 
               {/* Categories Selection */}
-              {selectedConditions.includes('category') && (
+              {selectedConditions.includes("category") && (
                 <div className="border border-slate-200 rounded-lg p-4">
                   <div className="flex items-center justify-between mb-3">
                     <label className="block text-sm font-medium text-slate-700">
@@ -382,7 +500,9 @@ export default function PromotionModal({ promotion, onClose, onSuccess }: Promot
                       <div
                         key={category.id}
                         className={`flex items-center gap-3 p-3 border-b border-slate-100 last:border-b-0 cursor-pointer hover:bg-slate-50 ${
-                          selectedCategories.includes(category.id) ? 'bg-blue-50' : ''
+                          selectedCategories.includes(category.id)
+                            ? "bg-blue-50"
+                            : ""
                         }`}
                         onClick={() => handleCategoryToggle(category.id)}
                       >
@@ -392,13 +512,17 @@ export default function PromotionModal({ promotion, onClose, onSuccess }: Promot
                           onChange={() => {}}
                           className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
                         />
-                        <span className="text-sm text-slate-700">{category.name}</span>
+                        <span className="text-sm text-slate-700">
+                          {category.name}
+                        </span>
                       </div>
                     ))}
                   </div>
                   {selectedCategories.length > 0 && (
                     <div className="mt-3">
-                      <p className="text-xs text-slate-500 mb-2">Selected categories:</p>
+                      <p className="text-xs text-slate-500 mb-2">
+                        Selected categories:
+                      </p>
                       <div className="flex flex-wrap gap-2">
                         {getSelectedCategoryNames().map((name, index) => (
                           <span
@@ -408,7 +532,9 @@ export default function PromotionModal({ promotion, onClose, onSuccess }: Promot
                             {name}
                             <button
                               type="button"
-                              onClick={() => handleCategoryToggle(selectedCategories[index])}
+                              onClick={() =>
+                                handleCategoryToggle(selectedCategories[index])
+                              }
                               className="hover:text-blue-900"
                             >
                               <X className="w-3 h-3" />
@@ -422,7 +548,7 @@ export default function PromotionModal({ promotion, onClose, onSuccess }: Promot
               )}
 
               {/* Brands Selection */}
-              {selectedConditions.includes('brand') && (
+              {selectedConditions.includes("brand") && (
                 <div className="border border-slate-200 rounded-lg p-4">
                   <div className="flex items-center justify-between mb-3">
                     <label className="block text-sm font-medium text-slate-700">
@@ -437,7 +563,7 @@ export default function PromotionModal({ promotion, onClose, onSuccess }: Promot
                       <div
                         key={brand.id}
                         className={`flex items-center gap-3 p-3 border-b border-slate-100 last:border-b-0 cursor-pointer hover:bg-slate-50 ${
-                          selectedBrands.includes(brand.id) ? 'bg-blue-50' : ''
+                          selectedBrands.includes(brand.id) ? "bg-blue-50" : ""
                         }`}
                         onClick={() => handleBrandToggle(brand.id)}
                       >
@@ -447,13 +573,17 @@ export default function PromotionModal({ promotion, onClose, onSuccess }: Promot
                           onChange={() => {}}
                           className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
                         />
-                        <span className="text-sm text-slate-700">{brand.name}</span>
+                        <span className="text-sm text-slate-700">
+                          {brand.name}
+                        </span>
                       </div>
                     ))}
                   </div>
                   {selectedBrands.length > 0 && (
                     <div className="mt-3">
-                      <p className="text-xs text-slate-500 mb-2">Selected brands:</p>
+                      <p className="text-xs text-slate-500 mb-2">
+                        Selected brands:
+                      </p>
                       <div className="flex flex-wrap gap-2">
                         {getSelectedBrandNames().map((name, index) => (
                           <span
@@ -463,7 +593,9 @@ export default function PromotionModal({ promotion, onClose, onSuccess }: Promot
                             {name}
                             <button
                               type="button"
-                              onClick={() => handleBrandToggle(selectedBrands[index])}
+                              onClick={() =>
+                                handleBrandToggle(selectedBrands[index])
+                              }
                               className="hover:text-green-900"
                             >
                               <X className="w-3 h-3" />
@@ -477,7 +609,7 @@ export default function PromotionModal({ promotion, onClose, onSuccess }: Promot
               )}
 
               {/* Products Selection */}
-              {selectedConditions.includes('product') && (
+              {selectedConditions.includes("product") && (
                 <div className="border border-slate-200 rounded-lg p-4">
                   <div className="flex items-center justify-between mb-3">
                     <label className="block text-sm font-medium text-slate-700">
@@ -492,7 +624,9 @@ export default function PromotionModal({ promotion, onClose, onSuccess }: Promot
                       <div
                         key={product.id}
                         className={`flex items-center gap-3 p-3 border-b border-slate-100 last:border-b-0 cursor-pointer hover:bg-slate-50 ${
-                          selectedProducts.includes(product.id) ? 'bg-blue-50' : ''
+                          selectedProducts.includes(product.id)
+                            ? "bg-blue-50"
+                            : ""
                         }`}
                         onClick={() => handleProductToggle(product.id)}
                       >
@@ -503,15 +637,21 @@ export default function PromotionModal({ promotion, onClose, onSuccess }: Promot
                           className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
                         />
                         <div>
-                          <span className="text-sm text-slate-700 block">{product.name}</span>
-                          <span className="text-xs text-slate-500">SKU: {product.sku}</span>
+                          <span className="text-sm text-slate-700 block">
+                            {product.name}
+                          </span>
+                          <span className="text-xs text-slate-500">
+                            SKU: {product.sku}
+                          </span>
                         </div>
                       </div>
                     ))}
                   </div>
                   {selectedProducts.length > 0 && (
                     <div className="mt-3">
-                      <p className="text-xs text-slate-500 mb-2">Selected products:</p>
+                      <p className="text-xs text-slate-500 mb-2">
+                        Selected products:
+                      </p>
                       <div className="flex flex-wrap gap-2">
                         {getSelectedProductNames().map((name, index) => (
                           <span
@@ -521,7 +661,9 @@ export default function PromotionModal({ promotion, onClose, onSuccess }: Promot
                             {name}
                             <button
                               type="button"
-                              onClick={() => handleProductToggle(selectedProducts[index])}
+                              onClick={() =>
+                                handleProductToggle(selectedProducts[index])
+                              }
                               className="hover:text-purple-900"
                             >
                               <X className="w-3 h-3" />
@@ -543,7 +685,9 @@ export default function PromotionModal({ promotion, onClose, onSuccess }: Promot
               </label>
               <select
                 value={formData.promotion_type}
-                onChange={(e) => setFormData({ ...formData, promotion_type: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, promotion_type: e.target.value })
+                }
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="percentage">Percentage (%)</option>
@@ -560,9 +704,13 @@ export default function PromotionModal({ promotion, onClose, onSuccess }: Promot
                 step="0.01"
                 required
                 value={formData.discount_value}
-                onChange={(e) => setFormData({ ...formData, discount_value: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, discount_value: e.target.value })
+                }
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder={formData.promotion_type === 'percentage' ? '10' : '50'}
+                placeholder={
+                  formData.promotion_type === "percentage" ? "10" : "50"
+                }
               />
             </div>
           </div>
@@ -576,7 +724,9 @@ export default function PromotionModal({ promotion, onClose, onSuccess }: Promot
                 type="date"
                 required
                 value={formData.start_date}
-                onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, start_date: e.target.value })
+                }
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
@@ -589,7 +739,9 @@ export default function PromotionModal({ promotion, onClose, onSuccess }: Promot
                 type="date"
                 required
                 value={formData.end_date}
-                onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, end_date: e.target.value })
+                }
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
@@ -600,10 +752,15 @@ export default function PromotionModal({ promotion, onClose, onSuccess }: Promot
               type="checkbox"
               id="is_active"
               checked={formData.is_active}
-              onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+              onChange={(e) =>
+                setFormData({ ...formData, is_active: e.target.checked })
+              }
               className="w-4 h-4 text-slate-900 border-slate-300 rounded focus:ring-blue-500"
             />
-            <label htmlFor="is_active" className="text-sm font-medium text-slate-700">
+            <label
+              htmlFor="is_active"
+              className="text-sm font-medium text-slate-700"
+            >
               Active (buyers will see this promotion)
             </label>
           </div>
@@ -618,10 +775,18 @@ export default function PromotionModal({ promotion, onClose, onSuccess }: Promot
             </button>
             <button
               type="submit"
-              disabled={loading || (formData.applies_to === 'specific' && selectedConditions.length === 0)}
+              disabled={
+                loading ||
+                (formData.applies_to === "specific" &&
+                  selectedConditions.length === 0)
+              }
               className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
             >
-              {loading ? 'Saving...' : promotion ? 'Update Promotion' : 'Create Promotion'}
+              {loading
+                ? "Saving..."
+                : promotion
+                  ? "Update Promotion"
+                  : "Create Promotion"}
             </button>
           </div>
         </form>
