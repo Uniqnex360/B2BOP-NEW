@@ -363,9 +363,10 @@ export default function BuyerModal({ onClose, onSuccess }: BuyerModalProps) {
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Password
+                  Password <span className="text-red-500">*</span>
                 </label>
                 <input
+                required
                   type="password"
                   value={formData.password}
                   onChange={(e) =>
@@ -386,11 +387,10 @@ export default function BuyerModal({ onClose, onSuccess }: BuyerModalProps) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Employee Count <span className="text-red-500">*</span>
+                  Employee Count 
                 </label>
                 <input
                   type="text"
-                  required
                   value={formData.employeeCount}
                   onChange={(e) =>
                     setFormData({ ...formData, employeeCount: e.target.value })
@@ -401,11 +401,10 @@ export default function BuyerModal({ onClose, onSuccess }: BuyerModalProps) {
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Years In Business <span className="text-red-500">*</span>
+                  Years In Business
                 </label>
                 <input
                   type="text"
-                  required
                   value={formData.yearsInBusiness}
                   onChange={(e) =>
                     setFormData({
@@ -420,7 +419,6 @@ export default function BuyerModal({ onClose, onSuccess }: BuyerModalProps) {
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
                   Do You Have a Showroom?{" "}
-                  <span className="text-red-500">*</span>
                 </label>
                 <div className="flex gap-6 items-center pt-1">
                   <label className="flex items-center gap-2 cursor-pointer">
@@ -467,10 +465,9 @@ export default function BuyerModal({ onClose, onSuccess }: BuyerModalProps) {
 
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Comments <span className="text-red-500">*</span>
+                  Comments
                 </label>
                 <textarea
-                  required
                   rows={4}
                   value={formData.comments}
                   onChange={(e) =>

@@ -556,6 +556,10 @@ export default function SellerOrderDetailPage({
     quantity: number,
   ) => {
     try {
+      console.log("EDIT RECORD:", record);
+      console.log("OLD WAREHOUSE:", record.warehouse_id);
+      console.log("NEW WAREHOUSE:", warehouseId);
+
       const { error: itemError } = await supabase
         .from("shipment_items")
         .update({
@@ -564,17 +568,26 @@ export default function SellerOrderDetailPage({
         })
         .eq("id", record.id);
 
-      if (itemError) throw itemError;
+      if (itemError) {
+        console.error("shipment_items UPDATE ERROR:", itemError);
+        throw itemError;
+      }
 
-      // Keep the parent shipment's warehouse in sync (shipments are 1 warehouse each in this flow)
-      const { error: shipmentError } = await supabase
-        .from("shipments")
-        .update({ warehouse_id: warehouseId })
-        .eq("id", record.shipment_id);
+      console.log("UPDATE REQUEST COMPLETED");
 
-      if (shipmentError) throw shipmentError;
+      const { data: verifyItem, error: verifyError } = await supabase
+        .from("shipment_items")
+        .select("id, warehouse_id, quantity")
+        .eq("id", record.id)
+        .maybeSingle();
+
+      console.log("VERIFY AFTER UPDATE:", verifyItem);
+      console.log("VERIFY ERROR:", verifyError);
+
+      if (verifyError) throw verifyError;
 
       alert("Fulfillment updated successfully!");
+
       await loadOrderDetails();
     } catch (error) {
       console.error("Error updating fulfillment:", error);
@@ -1140,7 +1153,7 @@ export default function SellerOrderDetailPage({
                                       setShowBulkModal(true);
                                     } else {
                                       setSelectedOrderItem(item);
-                                      setEditingRecord(null);
+                                      setEditingRecord(rec);
                                       setShowFulfillmentModal(true);
                                     }
                                   }}
