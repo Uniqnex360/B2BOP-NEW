@@ -420,7 +420,10 @@ export default function BuyerCatalogPage() {
     return (
       <ProductDetailPage
         productId={selectedProductId}
-        onBack={() => setSelectedProductId(null)}
+        onBack={() => {
+          setSelectedProductId(null);
+          loadData();
+        }}
         onAddToCart={(product, quantity) => {
           addToCart(product, quantity);
         }}
