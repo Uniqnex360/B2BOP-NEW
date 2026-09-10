@@ -238,8 +238,8 @@ export default function Layout({ children }: LayoutProps) {
           {/* Logo */}
           {/* -------------------------------------- */}
 
-          <div className="flex items-center justify-between p-6 border-b border-slate-200">
-            <div className="flex items-center gap-3">
+          <div className="flex items-center justify-between border-b border-slate-200">
+            {/* <div className="flex items-center gap-3 bg-red-500">
               {profile?.logo_url ? (
                 <img
                   src={profile.logo_url}
@@ -265,6 +265,9 @@ export default function Layout({ children }: LayoutProps) {
                   {profile?.role}
                 </p>
               </div>
+            </div> */}
+            <div className="flex items-center h-20 w-full">
+              <img src="/public/logo.png" alt="logo" className="object-contain w-full" />
             </div>
 
             <button
