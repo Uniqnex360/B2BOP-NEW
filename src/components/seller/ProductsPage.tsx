@@ -26,7 +26,7 @@ export default function ProductsPage() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(
-    new Set()
+    new Set(),
   );
   const [showProductModal, setShowProductModal] = useState(false);
   const [showBulkEdit, setShowBulkEdit] = useState(false);
@@ -84,7 +84,7 @@ export default function ProductsPage() {
               };
             }
             return { ...product, variant_count: 0 };
-          })
+          }),
         );
 
         setProducts(productsWithVariants);
@@ -94,7 +94,7 @@ export default function ProductsPage() {
           .select("id", { count: "exact", head: true })
           .in(
             "product_id",
-            data.map((p) => p.id)
+            data.map((p) => p.id),
           );
         setTotalVariants(count || 0);
       } else {
@@ -151,7 +151,7 @@ export default function ProductsPage() {
         (p) =>
           p.name.toLowerCase().includes(term) ||
           p.sku.toLowerCase().includes(term) ||
-          p.description?.toLowerCase().includes(term)
+          p.description?.toLowerCase().includes(term),
       );
     }
 
@@ -391,7 +391,7 @@ export default function ProductsPage() {
       }
 
       const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join(
-        "\n"
+        "\n",
       );
       const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
       const url = window.URL.createObjectURL(blob);
@@ -409,7 +409,7 @@ export default function ProductsPage() {
       alert("Failed to export products");
     }
   };
- 
+
   if (viewingProductId) {
     return (
       <SellerProductDetailPage
@@ -631,6 +631,19 @@ export default function ProductsPage() {
                       </span>
                     )}
                     <p className="text-sm text-slate-600">SKU: {product.sku}</p>
+
+                    {(product.min_order_quantity ||
+                      product.max_order_quantity) && (
+                      <p className="text-xs text-slate-500 mt-1">
+                        Order quantity:
+                        {product.min_order_quantity
+                          ? ` Min ${product.min_order_quantity}`
+                          : ""}
+                        {product.max_order_quantity
+                          ? ` Max ${product.max_order_quantity}`
+                          : ""}
+                      </p>
+                    )}
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2 mb-2">
